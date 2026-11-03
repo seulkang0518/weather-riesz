@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "official_preprocessing_executed_directly": true,
+  "compatibility_change": "flatten (N,1) scaler results before pandas column assignment",
+  "max_abs_error": {
+    "train_mean": 2.9802322387695312e-08,
+    "train_std": 0.0,
+    "train_context": 2.9802322387695312e-08,
+    "val_mean": 7.275957614183426e-12,
+    "val_std": 0.0,
+    "val_context": 7.275957614183426e-12,
+    "test_mean": 0.0,
+    "test_std": 0.0,
+    "test_context": 0.0
+  },
+  "targets_exact_float32": true,
+  "scope": "station group 1; all train/validation/test rows"
+}

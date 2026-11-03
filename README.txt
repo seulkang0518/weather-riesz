@@ -63,6 +63,27 @@ The paper's D=10 temperature averages (100 station groups) are ES 2.91 and
 VS 16.9 for CGM. These are context, NOT pass/fail targets for this one group.
 Comparisons of our two objectives use exactly the same group and output count.
 
+REPEAT OVER THE FIRST TEN OFFICIAL STATION GROUPS
+-----------------------------------------------
+    nohup python -u run_groups.py --device cpu > weather_10groups.log 2>&1 &
+    tail -f weather_10groups.log
+
+The runner uses supplied group indices 0-9, ten fits per method per group, and
+50 final scenarios. It reuses the completed runs/temperature10_group0 fits and
+the existing prepared group-0 data. It downloads the verified 1.36 GB source
+once to prepare groups 1-9; allow time for this download. No GPU is required.
+No hyperparameters change. Per-fit logs are in each seed's runner.log.
+
+Partial and final equal-weight group means, per-group scores and paired
+Riesz-minus-energy differences are written to:
+    runs/temperature10_groups0_9/summary.json
+
+Rerun the same command to resume. Existing manifests/evaluations are checked
+against the selected group, config, seeds and prepared-data hash before reuse.
+Ten groups are still a subset of the paper's 100; neighbouring groups may overlap.
+The descriptive spread across groups is not an independent-sample significance
+test. For a quick cached check: python run_groups.py --groups 0 --workdir runs/group0_reuse_check
+
 WHAT MATCHES
 ------------
 * Public temperature data: 48-hour ECMWF forecasts, 50 raw members.
