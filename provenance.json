@@ -1,0 +1,42 @@
+{
+  "official_repository": "https://github.com/jieyu97/mvpp",
+  "official_revision": "091ac33b613b7d79b4686d11eae81b48a5728257",
+  "riesz_source": "riesz_flow_sophia/riesz_topk_softmax.py",
+  "riesz_source_revision": "d38a9b6f402101c3355e3cb47b0e019e29ac8d7f",
+  "riesz_source_unmodified": true,
+  "riesz_sha256": "a64f0a97e8ae4998cec7e72b8fff7bae27563467c1a4f75acb6d2307455dd578",
+  "official_files_sha256": {
+    "third_party/mvpp/DRNcopula_mvpp_t2m.R": "befd4e0a678caec3e10b7cc4409c3fac81dc74753983a435c2b34a74b28891ac",
+    "third_party/mvpp/t2m_dist_10samples.csv": "35082d22bee98af72ab64c185b328b47f0eedca3d13c3a0e328adeb72501e086",
+    "third_party/mvpp/ws_dist_10samples.csv": "26ed05d4ee43ac76093faceb273e3f09bbdc53c12f9b51d624547c264e7f5325",
+    "third_party/mvpp/CGM_mvpp_ws.py": "5be05e9d839e793cd7d504ed4f1d842a56fc355cf3adbf4f9bdf9e731dd0f911",
+    "third_party/mvpp/cgm_models_linear.py": "8291d34ef3a4ecc713873cf80a2605c809d8184b0887396b44f6debdda0ebf21",
+    "third_party/mvpp/DRNcopula_mvpp_ws.R": "2c27a6eb9b54d445cf76821b1c4dcfe7fa8890932ba021cc17c886b27e92aba5",
+    "third_party/mvpp/LICENSE": "f6a4ed9fc20bc5cc482a1af45d554de717436c3052ee011dd3fec5ff2d9303c0",
+    "third_party/mvpp/scoring_rules_supp.py": "dfa70b4dabef9c831175e73da4e20d0a885dc2e2c9465e942e7de37fcebffc8b",
+    "third_party/mvpp/DRN_unipp_ws.ipynb": "ba5d9a1567da86ea579f43a4f644a21a60c0bd2e8d82de75fca19109a3b24d89",
+    "third_party/mvpp/t2m_dist_5samples.csv": "feb752d02f1f15e30657a8a813a9c6100e4827f6e1db9034474577dea62241c3",
+    "third_party/mvpp/ws_dist_20samples.csv": "55ac095bceaf12b121d170b6afee8a45f1a9e5297b63972f1c457749e8591b3a",
+    "third_party/mvpp/CGM_supplement.pdf": "d0e290e3b2c00c13d6cc5aeb341e12a18e860571d4866fcf12e31571a51a9ded",
+    "third_party/mvpp/t2m_dist_20samples.csv": "c44eefe29ebbfa0597437dfae915b286f7eaefca655ea6dcf64e40b95d74f0bd",
+    "third_party/mvpp/README.md": "0a242a4773ccfcc07d464ec601b94cf2a9065b09ba20657ca5cc0bf96d42d29d",
+    "third_party/mvpp/EMOScopula_mvpp_t2m.R": "0757ce4b5e22eaf904f573bbfc4de86bad10b23d8ec31938e580bf68ae9fac62",
+    "third_party/mvpp/.gitignore": "2ef767385125df7d546a79f251e267fab5c0e68a652128987a6982cb61d53584",
+    "third_party/mvpp/EMOScopula_mvpp_ws.R": "269231427edb57d96b73efdcdf1d98cb7ac10e2d38da13be88ab41b22d1fcc92",
+    "third_party/mvpp/ws_dist_5samples.csv": "16e911695627f21861d806b4503c8639f691ac3974268c7b6d65e9e78207ac74",
+    "third_party/mvpp/DRN_unipp_t2m.ipynb": "a8c46ea4198fe001ace37cee3dbd86e82bea23b732df2119f7dcd1194315fe06",
+    "third_party/mvpp/CGM_mvpp_t2m.py": "ace8a52a96ba9f8a571e16e7a04c3e104eec70eb9d0e68f1ddc803f2605449bf"
+  },
+  "experiment_files_sha256": {
+    "prepare_data.py": "0d0f0b0505e8512c7c5595f0fd7e5e3e3a98b356ff0110df870150c4e76cd695",
+    "train.py": "ca2e85b1c7c0c28f7f3eb2e3f681241878601f75cfa41c7a1b29e61fb750f0cc",
+    "check_preprocessing.py": "8b8fa014cdd66aa1174882bacd948fb1e458f45c74dcdecba8af4a43d50ef2c5",
+    "evaluate.py": "1ad7f8763006780f4d19b937ff77ce2a81ff9db263d4315b2c2b90a26f36176e",
+    "weather/metrics.py": "e805cba78ca6d60f2f814e3d4b253af782fcb66d4f52d4881182fb69df73e1a6",
+    "weather/__init__.py": "1e09860995df3baafee510f28140afeb79d744517cc773fd228824c89d1e5f1e",
+    "weather/model.py": "0be00572b276189ebc93a295f58d12f9048aaec826160da930ef853e1632fa6f",
+    "weather/objectives.py": "84119ac8d859907adcce5e82ccf5525fecc95164acd4b0b6d7f44bd251261f6b",
+    "weather/riesz_topk_softmax.py": "a64f0a97e8ae4998cec7e72b8fff7bae27563467c1a4f75acb6d2307455dd578"
+  },
+  "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
+}

@@ -1,0 +1,9 @@
+data/*
+!data/temperature10_group0.npz
+!data/temperature10_group0.json
+runs/
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+.DS_Store

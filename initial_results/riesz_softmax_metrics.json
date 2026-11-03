@@ -1,0 +1,91 @@
+{
+  "method": "riesz_softmax",
+  "cases": 365,
+  "stations": 10,
+  "scenarios": 50,
+  "models": [
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed42/best.pt",
+      "seed": 42,
+      "epoch": 30,
+      "val_energy_training_form": 3.3848976411527247,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed43/best.pt",
+      "seed": 43,
+      "epoch": 13,
+      "val_energy_training_form": 3.3329286283105195,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed44/best.pt",
+      "seed": 44,
+      "epoch": 19,
+      "val_energy_training_form": 3.30019142767181,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed45/best.pt",
+      "seed": 45,
+      "epoch": 13,
+      "val_energy_training_form": 3.384107116869233,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed46/best.pt",
+      "seed": 46,
+      "epoch": 18,
+      "val_energy_training_form": 3.346314581655858,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed47/best.pt",
+      "seed": 47,
+      "epoch": 21,
+      "val_energy_training_form": 3.3454682076541826,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed48/best.pt",
+      "seed": 48,
+      "epoch": 14,
+      "val_energy_training_form": 3.367205309004505,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed49/best.pt",
+      "seed": 49,
+      "epoch": 21,
+      "val_energy_training_form": 3.3698633985599105,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed50/best.pt",
+      "seed": 50,
+      "epoch": 15,
+      "val_energy_training_form": 3.389186210951101,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/riesz_softmax/seed51/best.pt",
+      "seed": 51,
+      "epoch": 23,
+      "val_energy_training_form": 3.3004641732133533,
+      "smoke_only": false
+    }
+  ],
+  "scope": "one station group (not the paper average over 100 groups)",
+  "paper_sampling_protocol": true,
+  "metrics": {
+    "energy_score": 3.0842634654904093,
+    "variogram_score": 17.77787200507462,
+    "mean_crps": 0.8331897739109261
+  },
+  "raw_ensemble_metrics": {
+    "energy_score": 4.844957852634853,
+    "variogram_score": 53.77363478987506,
+    "mean_crps": 1.2339474329110494
+  },
+  "data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
+}

@@ -1,0 +1,19 @@
+INITIAL REAL-DATA RESULT (CPU)
+
+Temperature, official group 0, 10 stations; 2007-2014 train, 2015 validation, 2016 test.
+Ten independent seeds per method; five scenarios per model = 50 total.
+
+Method             Energy score    Variogram score    Mean CRPS
+Raw ensemble          4.844958          53.773635        1.233947
+Energy training       2.958199          17.424499        0.799875
+Riesz softmax         3.084263          17.777872        0.833190
+
+Lower is better. Baseline slightly better in this initial test; no Riesz tuning.
+These are ONE group, not the paper average over 100 groups. The model is a
+PyTorch port, not bitwise TensorFlow replication. See README.txt for differences.
+
+Validation: 4 tests pass; direct original-script preprocessing parity (max
+float32 error 2.33e-10), exact targets, and resume/uninterrupted weight equality.
+Full checkpoints/predictions remain in local runs/temperature10_group0/.
+ZIP contains code, prepared public data and JSON results, not run checkpoints
+or the full 1.36GB source dataset.

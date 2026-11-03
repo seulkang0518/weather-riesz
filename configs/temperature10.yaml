@@ -1,0 +1,15 @@
+# Controlled first experiment; station-group 0 of the paper's supplied 100 groups.
+stations: 10
+group: 0
+latent_dim: 10
+train_samples: 50
+batch_size: 64
+learning_rate: 0.001
+adam_epsilon: 1.0e-7   # TensorFlow/Keras Adam default; PyTorch default differs
+epochs: 300
+patience: 10
+seeds: [42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
+validation_seed: 20261103
+test_seed: 20261104
+eval_samples_per_model: 5
+temperatures: [0.2, 0.05, 0.02]

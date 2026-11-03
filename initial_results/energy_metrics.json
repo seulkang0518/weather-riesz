@@ -1,0 +1,91 @@
+{
+  "method": "energy",
+  "cases": 365,
+  "stations": 10,
+  "scenarios": 50,
+  "models": [
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed42/best.pt",
+      "seed": 42,
+      "epoch": 30,
+      "val_energy_training_form": 3.1908121135573535,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed43/best.pt",
+      "seed": 43,
+      "epoch": 27,
+      "val_energy_training_form": 3.178795710911658,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed44/best.pt",
+      "seed": 44,
+      "epoch": 19,
+      "val_energy_training_form": 3.181997485147545,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed45/best.pt",
+      "seed": 45,
+      "epoch": 17,
+      "val_energy_training_form": 3.2204523325630547,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed46/best.pt",
+      "seed": 46,
+      "epoch": 18,
+      "val_energy_training_form": 3.185002340247704,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed47/best.pt",
+      "seed": 47,
+      "epoch": 24,
+      "val_energy_training_form": 3.20772741631213,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed48/best.pt",
+      "seed": 48,
+      "epoch": 34,
+      "val_energy_training_form": 3.1763683095947948,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed49/best.pt",
+      "seed": 49,
+      "epoch": 35,
+      "val_energy_training_form": 3.1935802236572948,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed50/best.pt",
+      "seed": 50,
+      "epoch": 25,
+      "val_energy_training_form": 3.236487173436412,
+      "smoke_only": false
+    },
+    {
+      "checkpoint": "runs/temperature10_group0/energy/seed51/best.pt",
+      "seed": 51,
+      "epoch": 29,
+      "val_energy_training_form": 3.1603575257537755,
+      "smoke_only": false
+    }
+  ],
+  "scope": "one station group (not the paper average over 100 groups)",
+  "paper_sampling_protocol": true,
+  "metrics": {
+    "energy_score": 2.9581994377009946,
+    "variogram_score": 17.424498983699948,
+    "mean_crps": 0.7998748269111505
+  },
+  "raw_ensemble_metrics": {
+    "energy_score": 4.844957852634853,
+    "variogram_score": 53.77363478987506,
+    "mean_crps": 1.2339474329110494
+  },
+  "data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
+}

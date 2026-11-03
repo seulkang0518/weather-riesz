@@ -1,0 +1,6 @@
+{
+  "resume_matches_uninterrupted_exactly": true,
+  "epochs": 2,
+  "batches_per_epoch": 2,
+  "data": "real prepared group 0"
+}

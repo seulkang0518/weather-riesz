@@ -1,0 +1,27 @@
+{
+  "scope": "one official 10-station temperature group (group 0), CPU PyTorch port",
+  "train_cases": 2880,
+  "validation_cases": 359,
+  "test_cases": 365,
+  "models_per_method": 10,
+  "final_scenarios": 50,
+  "tuning": "none; initial common learning rate and existing Riesz temperatures",
+  "methods": {
+    "energy": {
+      "energy_score": 2.9581994377009946,
+      "variogram_score": 17.424498983699948,
+      "mean_crps": 0.7998748269111505
+    },
+    "riesz_softmax": {
+      "energy_score": 3.0842634654904093,
+      "variogram_score": 17.77787200507462,
+      "mean_crps": 0.8331897739109261
+    }
+  },
+  "raw_ensemble": {
+    "energy_score": 4.844957852634853,
+    "variogram_score": 53.77363478987506,
+    "mean_crps": 1.2339474329110494
+  },
+  "interpretation": "Energy training is better on all three scores in this initial group. Both improve on raw forecasts. No statistical significance or 100-group replication claimed."
+}
