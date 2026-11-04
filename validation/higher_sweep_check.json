@@ -1,0 +1,7 @@
+{
+  "scope": "real-data group-0 development-grid extension from scales 1/4 to 4/6",
+  "prior_fit_reused": true,
+  "prior_selection_unchanged": true,
+  "rerun_retrained": false,
+  "test_evaluation_run": false
+}

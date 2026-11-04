@@ -45,6 +45,22 @@ def rank_trials(trials, groups, seeds, multipliers):
     return sorted(ranking, key=lambda x: x['mean_validation_energy'])
 
 
+def reusable_trials(selection, base):
+    """Index a complete earlier validation sweep; never import test results."""
+    exp = selection['experiment']
+    if exp['base_config'] != base or selection['test_evaluated_by_this_sweep'] is not False:
+        raise ValueError('Earlier sweep has another base config or used test evaluation')
+    trials = selection['trials']
+    if len(trials) != len(exp['groups'])*len(exp['seeds'])*len(exp['multipliers']):
+        raise ValueError('Earlier sweep does not contain exactly its complete trial grid')
+    if selection['ranking'] != rank_trials(trials,exp['groups'],exp['seeds'],exp['multipliers']):
+        raise ValueError('Earlier sweep validation ranking does not match its trials')
+    for trial in trials:
+        if trial['temperatures'] != temperatures(base['temperatures'],trial['multiplier']):
+            raise ValueError('Earlier trial temperature values are inconsistent')
+    return {(r['group'],r['seed'],r['multiplier']):r for r in trials}
+
+
 def fit_record(work, cfg, seed, data_hash):
     state = torch.load(work/'latest.pt', map_location='cpu', weights_only=False)
     manifest = json.loads((work/'manifest.json').read_text())
@@ -76,6 +92,7 @@ def main():
     p.add_argument('--source', default='data/temperature_data_cgm_std.feather')
     p.add_argument('--existing-runs', default='runs/temperature10_groups0_9')
     p.add_argument('--group0-run', default='runs/temperature10_group0')
+    p.add_argument('--reuse-sweep', help='Earlier sweep directory or selection.json; reuse compatible frozen fits')
     p.add_argument('--workdir', default='runs/temperature_validation_sweep')
     a = p.parse_args()
     def absolute(path):
@@ -90,12 +107,21 @@ def main():
         p.error('Use distinct 10-station groups, seeds from the base config, and distinct multipliers')
     for multiplier in a.multipliers:
         temperatures(base['temperatures'], multiplier)
+    previous, reuse_index, reuse_hash = None, {}, None
+    if a.reuse_sweep:
+        reuse_path = absolute(a.reuse_sweep)
+        if reuse_path.is_dir(): reuse_path = reuse_path/'selection.json'
+        previous = json.loads(reuse_path.read_text())
+        reuse_index = reusable_trials(previous,base)
+        reuse_hash = digest(reuse_path)
     root = absolute(a.workdir); root.mkdir(parents=True, exist_ok=True)
     data_dir = absolute(a.data_dir); data_dir.mkdir(parents=True, exist_ok=True)
     spec = {'base_config': base, 'groups': a.groups, 'seeds': a.seeds, 'multipliers': a.multipliers,
             'selection': 'equal-group mean of per-seed best 2015 validation training-form energy score',
             'test_use': 'none in sweep; 2016 was already inspected in the prior baseline experiment',
             'field_count': len(base['temperatures'])}
+    if reuse_hash is not None:
+        spec['reuse_sweep_sha256'] = reuse_hash
     spec_path = root/'experiment.json'
     if spec_path.exists() and json.loads(spec_path.read_text()) != spec:
         raise ValueError('Sweep workdir belongs to another grid/config; use a new workdir')
@@ -117,12 +143,23 @@ def main():
             cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False))
             for seed in a.seeds:
                 work = root/label/f'group{group:02d}'/f'seed{seed}'
-                if multiplier == 1:
+                prior = reuse_index.get((group,seed,multiplier))
+                if prior is not None:
+                    if previous['data_hashes'][str(group)] != data_hash:
+                        raise ValueError('Prepared data differs from the earlier sweep')
+                    work = absolute(prior['checkpoint']).parent
+                    if digest(work/'best.pt') != prior['checkpoint_sha256']:
+                        raise ValueError('Earlier checkpoint changed after its sweep was frozen')
+                elif multiplier == 1:
                     original = (absolute(a.group0_run) if group == 0 else
                                 absolute(a.existing_runs)/f'group{group:02d}')/'riesz_softmax'/f'seed{seed}'
                     if (original/'latest.pt').exists():
                         work = original
                 record = fit_record(work, cfg, seed, data_hash) if (work/'latest.pt').exists() else None
+                if prior is not None:
+                    if record is None or record['validation_energy'] != prior['validation_energy']:
+                        raise ValueError('Earlier fit no longer matches the frozen validation trial')
+                    print(f'Group {group}, {label}, seed {seed}: reusing earlier sweep fit',flush=True)
                 if record is None:
                     work.mkdir(parents=True, exist_ok=True)
                     command = [sys.executable, '-u', 'train.py', '--data', str(data), '--config', str(cfg_path),

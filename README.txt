@@ -119,10 +119,28 @@ validation ranking first. No energy-baseline hyperparameters are tuned by it.
 
 TEST THE FROZEN VALIDATION-SELECTION
 -----------------------------------
-After the sweep finishes, keep its selection.json unchanged and run:
+An optional modest extension ABOVE scale 16 can reuse the prior sweep:
+
+    nohup python -u tune_temperature.py --device cpu --multipliers 16 24 32 \
+      --reuse-sweep runs/temperature_validation_sweep \
+      --workdir runs/temperature_validation_higher > weather_temperature_higher.log 2>&1 &
+
+This compares [.2,.05,.02] times 16, 24 and 32, i.e. [3.2,.8,.32],
+[4.8,1.2,.48], and [6.4,1.6,.64]. Default groups/seeds stay 0-2 / 42-44.
+The nine scale-16 fits are reused after config, data and checkpoint-hash checks;
+only the 18 scale-24/32 fits are new. The original sweep/selection stays intact.
+The new selection is in runs/temperature_validation_higher/selection.json.
+This is another exploratory validation search; it does not run test evaluation.
+
+After the ORIGINAL sweep finishes, keep its selection.json unchanged and run:
 
     nohup python -u evaluate_selected.py --device cpu > weather_selected_test.log 2>&1 &
     tail -f weather_selected_test.log
+
+The default above reads the ORIGINAL selection. To evaluate a later higher-grid
+selection, explicitly use --selection runs/temperature_validation_higher/selection.json
+and a NEW --workdir runs/temperature_higher_selected_test. Review/freeze the new
+validation choice first; the higher-grid tuning command does not run this test.
 
 This recomputes the winner from the complete saved validation ranking, freezes
 the selection file/hash in a new output directory, and evaluates only that
