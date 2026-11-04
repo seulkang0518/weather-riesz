@@ -117,6 +117,31 @@ and model provenance before reuse. An existing final selection cannot silently
 change. Finishing this command does NOT launch test evaluation; review the
 validation ranking first. No energy-baseline hyperparameters are tuned by it.
 
+TEST THE FROZEN VALIDATION-SELECTION
+-----------------------------------
+After the sweep finishes, keep its selection.json unchanged and run:
+
+    nohup python -u evaluate_selected.py --device cpu > weather_selected_test.log 2>&1 &
+    tail -f weather_selected_test.log
+
+This recomputes the winner from the complete saved validation ranking, freezes
+the selection file/hash in a new output directory, and evaluates only that
+selected setting. Original energy and untuned-Riesz scores/fits are reused from
+the completed group-0 and ten-group runs, with exact config/data checks. The
+selected sweep fits (normally nine) are reused with checkpoint SHA256 checks;
+only missing seeds/groups at the selected temperatures are trained. Ten models
+times five samples give 50 test scenarios per group. No other hyperparameters
+change and no test score selects a temperature.
+
+Results, including the original Riesz scores for context, accumulate in:
+    runs/temperature_selected_test/summary.json
+
+Rerun the same command to resume. Changing the selection/config requires a new
+workdir; it cannot overwrite the frozen run. Originals are never overwritten.
+This remains an exploratory follow-up on the previously inspected 2016 test
+year, not a new untouched holdout. Do not keep choosing temperatures from test
+results. The default test scope is the same ten station groups (0-9).
+
 WHAT MATCHES
 ------------
 * Public temperature data: 48-hour ECMWF forecasts, 50 raw members.

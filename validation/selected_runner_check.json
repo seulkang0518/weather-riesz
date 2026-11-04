@@ -1,0 +1,9 @@
+{
+  "scope": "real-data group-0 pipeline check using the development scale-4 selection; not the user scale-16 ten-group result",
+  "full_ensemble_models": 10,
+  "reused_sweep_fits": 1,
+  "test_scenarios": 50,
+  "rerun_retrained": false,
+  "rerun_reevaluated": false,
+  "summary_complete": true
+}
