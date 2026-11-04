@@ -1,0 +1,19 @@
+{
+  "real_data_grid": {
+    "groups": [
+      0
+    ],
+    "seeds": [
+      42
+    ],
+    "multipliers": [
+      1,
+      4
+    ]
+  },
+  "trials_completed": 2,
+  "rerun_reused_all_fits": true,
+  "frozen_selection_unchanged": true,
+  "test_evaluation_run": false,
+  "purpose": "pipeline check, not the default full validation sweep"
+}

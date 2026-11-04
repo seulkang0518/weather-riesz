@@ -84,6 +84,39 @@ Ten groups are still a subset of the paper's 100; neighbouring groups may overla
 The descriptive spread across groups is not an independent-sample significance
 test. For a quick cached check: python run_groups.py --groups 0 --workdir runs/group0_reuse_check
 
+VALIDATION-ONLY TEMPERATURE SWEEP
+--------------------------------
+    nohup python -u tune_temperature.py --device cpu > weather_temperature_sweep.log 2>&1 &
+    tail -f weather_temperature_sweep.log
+
+Default grid multiplies the original [.2,.05,.02] by 1, .25, 4 and 16.
+Each candidate still sums THREE RMS-normalized fields. Testing one field
+against three would also change the aggregate update scale; we avoid that
+confound. Learning rate, architecture, particle count and other settings stay
+fixed. We fit seeds 42-44 on station groups 0-2: 36 trial cells. The nine
+original-setting fits are reused from the completed group runs where present,
+leaving 27 new fits. Missing group data is prepared from the same source file.
+
+Selection minimizes the equal-group average of best per-seed 2015 validation
+energy scores (the training-form U-denominator score used for early stopping).
+The same validation set therefore selects both checkpoints and temperatures;
+there is no separate nested validation split or claim of unbiased validation
+performance. This is an inexpensive exploratory search over three groups.
+The runner never calls evaluate.py or reads test metrics. The 2016 test results
+have already been inspected in the original comparison, so they are not a
+previously untouched holdout. Do not choose a candidate by evaluating all of
+them on 2016. Freeze the validation choice before the next test comparison.
+
+Progress and final ranked selection are saved to:
+    runs/temperature_validation_sweep/progress.json
+    runs/temperature_validation_sweep/selection.json
+    runs/temperature_validation_sweep/selected_config.yaml
+
+Rerunning resumes incomplete fits and checks the prior grid, config, data hashes
+and model provenance before reuse. An existing final selection cannot silently
+change. Finishing this command does NOT launch test evaluation; review the
+validation ranking first. No energy-baseline hyperparameters are tuned by it.
+
 WHAT MATCHES
 ------------
 * Public temperature data: 48-hour ECMWF forecasts, 50 raw members.
