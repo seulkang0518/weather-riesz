@@ -1,0 +1,9 @@
+{
+  "scope": "real-data group-0 development LR selection; dev temperature scale 4 and selected LR .001 for both; not the user scale-512 / LR .0005 test result",
+  "models_per_method": 10,
+  "scenarios_per_method": 50,
+  "summary_complete": true,
+  "rerun_retrained": false,
+  "rerun_reevaluated": false,
+  "baseline_reuses_verified": true
+}

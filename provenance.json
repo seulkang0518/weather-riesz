@@ -40,7 +40,8 @@
     "run_groups.py": "7af06312f66662c20fd2220662335d7166b66998a24c27d5ab6c8a7743df9519",
     "tune_temperature.py": "b1f4f8e07beeb5f66cd5d79d5828cd7ab93355206cc024eec959550e6e731464",
     "evaluate_selected.py": "e75d5fa3993b47860162e86a328760185e0d11f92a94c8070332bef0323d19f0",
-    "tune_learning_rate.py": "834c8aa3321b080e5890543f0d033e198a8207b208f24fb3ab3c0e2bb0b884c0"
+    "tune_learning_rate.py": "834c8aa3321b080e5890543f0d033e198a8207b208f24fb3ab3c0e2bb0b884c0",
+    "evaluate_learning_rate.py": "69cb6346580d24cbdda7b2c380b1712171fb747be4097a9b163d11485ca678dd"
   },
   "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
 }

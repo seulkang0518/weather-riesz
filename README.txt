@@ -191,6 +191,35 @@ Rerun the same command to resume. Different grids or temperature selections need
 a new workdir. Read the validation ranking before planning test evaluation.
 The LR selection artifact is a distinct format from temperature selection.json;
 evaluate_selected.py accepts temperature selections only, not lr_selection.json.
+Use the runner below after freezing the independent LR choices.
+
+TEST THE FROZEN LEARNING-RATE CHOICES
+------------------------------------
+    nohup python -u evaluate_learning_rate.py --device cpu > weather_lr_selected_test.log 2>&1 &
+    tail -f weather_lr_selected_test.log
+
+Defaults read runs/temperature_learning_rate_sweep/lr_selection.json and verify
+its full validation ranking plus the underlying frozen temperature choice.
+The winning LR is applied separately for energy and Riesz; neither choice is
+made using test scores. Each method is evaluated with ten seeds x five samples
+on groups 0-9. The 18 selected LR-sweep fits are reused where available, and only
+missing seeds/groups are trained. If the original LR wins, compatible completed
+fits are reused for all seeds. All reuses check config, data and provenance.
+
+Context columns come from the original energy fits and the fixed-temperature
+Riesz results BEFORE LR tuning, i.e. the earlier scale-512 run in the current
+experiment. The latter defaults to runs/temperature_extended_selected_test;
+override --temperature-test-runs if those results live elsewhere. Original
+fits, validation selections and test results are not overwritten.
+
+New results accumulate in:
+    runs/temperature_learning_rate_selected_test/summary.json
+
+Rerun to resume with identical frozen selections. A changed LR/temperature
+selection or group list requires a new workdir. Checkpoint SHA256 identities
+and evaluation records are validated before reuse. The comparison is still
+an exploratory follow-up on the previously inspected 2016 test year; the two
+methods have matched LR grids but unequal total historical tuning effort.
 
 WHAT MATCHES
 ------------
