@@ -29,7 +29,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--data', default='data/temperature10_group0.npz')
     p.add_argument('--config', default='configs/temperature10.yaml')
-    p.add_argument('--method', choices=['energy', 'riesz_softmax'], required=True)
+    p.add_argument('--method', choices=['energy', 'riesz_softmax', 'riesz_uniform'], required=True)
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--device', default='cpu', choices=['cpu', 'cuda'])
     p.add_argument('--threads', type=int, default=2)
@@ -96,7 +96,8 @@ def main():
             pred = predict(model, inputs['train'], idx, cfg['train_samples'], generator)
             loss = (training_energy_score(pred, inputs['train']['target'][idx]).mean()
                     if a.method == 'energy' else
-                    riesz_loss(pred, inputs['train']['target'][idx], cfg['temperatures'])[0].mean())
+                    riesz_loss(pred, inputs['train']['target'][idx], cfg['temperatures'],
+                               weighting='uniform' if a.method=='riesz_uniform' else 'softmax')[0].mean())
             if not torch.isfinite(loss):
                 raise FloatingPointError(f'Nonfinite loss, epoch {epoch+1}, batch {batch}')
             loss.backward()

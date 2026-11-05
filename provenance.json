@@ -29,19 +29,21 @@
   },
   "experiment_files_sha256": {
     "prepare_data.py": "0d0f0b0505e8512c7c5595f0fd7e5e3e3a98b356ff0110df870150c4e76cd695",
-    "train.py": "ca2e85b1c7c0c28f7f3eb2e3f681241878601f75cfa41c7a1b29e61fb750f0cc",
+    "train.py": "2ab818bf09dcc10eee60d60b405ae4f5879f9050367bfe3d636522cf3a2bd1c4",
     "check_preprocessing.py": "8b8fa014cdd66aa1174882bacd948fb1e458f45c74dcdecba8af4a43d50ef2c5",
     "evaluate.py": "1ad7f8763006780f4d19b937ff77ce2a81ff9db263d4315b2c2b90a26f36176e",
     "weather/metrics.py": "e805cba78ca6d60f2f814e3d4b253af782fcb66d4f52d4881182fb69df73e1a6",
     "weather/__init__.py": "1e09860995df3baafee510f28140afeb79d744517cc773fd228824c89d1e5f1e",
     "weather/model.py": "0be00572b276189ebc93a295f58d12f9048aaec826160da930ef853e1632fa6f",
-    "weather/objectives.py": "84119ac8d859907adcce5e82ccf5525fecc95164acd4b0b6d7f44bd251261f6b",
+    "weather/objectives.py": "733377c2c6416a817fcee3b39e997856799135075ada15afe8a49c43f6bcbe06",
     "weather/riesz_topk_softmax.py": "a64f0a97e8ae4998cec7e72b8fff7bae27563467c1a4f75acb6d2307455dd578",
     "run_groups.py": "7af06312f66662c20fd2220662335d7166b66998a24c27d5ab6c8a7743df9519",
     "tune_temperature.py": "b1f4f8e07beeb5f66cd5d79d5828cd7ab93355206cc024eec959550e6e731464",
     "evaluate_selected.py": "e75d5fa3993b47860162e86a328760185e0d11f92a94c8070332bef0323d19f0",
     "tune_learning_rate.py": "834c8aa3321b080e5890543f0d033e198a8207b208f24fb3ab3c0e2bb0b884c0",
-    "evaluate_learning_rate.py": "69cb6346580d24cbdda7b2c380b1712171fb747be4097a9b163d11485ca678dd"
+    "evaluate_learning_rate.py": "69cb6346580d24cbdda7b2c380b1712171fb747be4097a9b163d11485ca678dd",
+    "compare_uniform.py": "343ccd26730db77f6e5a9fd1d4ff2304f95ffebb32240cdaebd0fdad194c7cd8",
+    "weather/uniform_riesz.py": "6651aa6e59dd72d9e954804c95c55a71371fc1d2834b5e2b6be54269c95b3666"
   },
   "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
 }

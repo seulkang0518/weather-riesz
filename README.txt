@@ -221,6 +221,46 @@ and evaluation records are validated before reuse. The comparison is still
 an exploratory follow-up on the previously inspected 2016 test year; the two
 methods have matched LR grids but unequal total historical tuning effort.
 
+EXACT UNIFORM-WEIGHT ABLATION
+----------------------------
+After the tuned-LR ten-group comparison has finished:
+
+    nohup python -u compare_uniform.py --device cpu > weather_uniform.log 2>&1 &
+    tail -f weather_uniform.log
+
+This reads the frozen LR selection and reuses the energy and Riesz results in
+runs/temperature_learning_rate_selected_test. It trains only the uniform-weight
+Riesz variant: same architecture, seeds, data, 50 training particles, learning
+rate, validation checkpoint selection and normalization as the chosen softmax
+run. In the current experiment the LR is .0005 and the three temperatures are
+[102.4,25.6,10.24]. There is no additional uniform-specific hyperparameter search.
+
+Each generated particle's repulsion weights become exactly 1/(M-1) across all
+OTHER generated particles; the diagonal remains excluded. The sole observed
+positive already has weight 1. Unit direction vectors, detached global distance
+scale, coordinate floor, three 1/tau prefactors, per-field RMS normalization and
+its numerical floor, field summation and stopped-target regression are retained.
+The three uniform fields normally share a direction, but all three contributions
+are retained so this does not reduce the summed update by a factor of three.
+With uniform weights tau no longer controls neighbour concentration; its stored
+prefactors remain only to hold the rest of the arithmetic/flooring fixed.
+
+The upstream weather/riesz_topk_softmax.py file is unchanged. The uniform
+implementation is separate, and tests compare its losses/gradients with the
+original implementation when only finite softmax logits are replaced by zero.
+The training method is explicitly recorded as riesz_uniform in manifests.
+
+Ten seeds per group give 50 final scenarios, as before. Reference fits/results
+are validated and read without modification. Only new uniform fits are trained
+(100 across the default ten groups); output lives separately at:
+    runs/temperature_uniform_comparison/summary.json
+
+Rerun the same command to resume. The table reports energy, riesz_softmax and
+riesz_uniform scores, plus raw forecasts. Per-group uniform-minus-softmax score
+differences are also stored. This is a controlled diagnostic at inherited
+settings, on the previously inspected 2016 test year, not a new untouched test.
+There is no automatic choice to replace softmax based on these test scores.
+
 WHAT MATCHES
 ------------
 * Public temperature data: 48-hour ECMWF forecasts, 50 raw members.

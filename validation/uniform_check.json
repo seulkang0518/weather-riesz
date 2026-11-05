@@ -1,0 +1,9 @@
+{
+  "scope": "real-data group-0 development integration at LR .001 / scale 4; not the user LR .0005 / scale-512 result",
+  "uniform_models": 10,
+  "final_scenarios": 50,
+  "rerun_retrained": false,
+  "rerun_reevaluated": false,
+  "reference_results_unchanged": true,
+  "upstream_reference_file_unchanged": true
+}
