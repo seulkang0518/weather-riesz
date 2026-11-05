@@ -160,6 +160,38 @@ This remains an exploratory follow-up on the previously inspected 2016 test
 year, not a new untouched holdout. Do not keep choosing temperatures from test
 results. The default test scope is the same ten station groups (0-9).
 
+VALIDATION-ONLY LEARNING-RATE SEARCH FOR BOTH METHODS
+----------------------------------------------------
+After freezing the extended temperature choice, run:
+
+    nohup python -u tune_learning_rate.py --device cpu > weather_learning_rate.log 2>&1 &
+    tail -f weather_learning_rate.log
+
+By default this reads runs/temperature_validation_extended/selection.json and
+holds its winning Riesz temperatures fixed (scale 512 in the current experiment).
+It tries learning rates .0005, .001 and .002 for BOTH energy and Riesz, using
+the same groups 0-2, seeds 42-44, patience, maximum epochs and validation score.
+There are 54 trial cells; the nine original energy fits and nine selected Riesz
+fits at LR .001 are reused where available, leaving 36 new fits. The algorithm,
+architecture, particle count, temperature normalization and Adam settings stay
+unchanged. The original fits are not resumed/modified by this search.
+
+Each method selects its own LR from equal-group mean 2015 validation energy.
+Both methods get the same LR search budget, but Riesz has had ADDITIONAL prior
+temperature tuning; this is not equal total historical tuning effort. As before,
+validation also selects checkpoints, and 2016 has already been inspected in
+earlier experiments. No test metrics/predictions are used by this LR runner.
+
+The ranking, checkpoint hashes and frozen choices are saved to:
+    runs/temperature_learning_rate_sweep/lr_selection.json
+    runs/temperature_learning_rate_sweep/selected_energy.yaml
+    runs/temperature_learning_rate_sweep/selected_riesz_softmax.yaml
+
+Rerun the same command to resume. Different grids or temperature selections need
+a new workdir. Read the validation ranking before planning test evaluation.
+The LR selection artifact is a distinct format from temperature selection.json;
+evaluate_selected.py accepts temperature selections only, not lr_selection.json.
+
 WHAT MATCHES
 ------------
 * Public temperature data: 48-hour ECMWF forecasts, 50 raw members.

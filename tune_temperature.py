@@ -61,11 +61,11 @@ def reusable_trials(selection, base):
     return {(r['group'],r['seed'],r['multiplier']):r for r in trials}
 
 
-def fit_record(work, cfg, seed, data_hash):
+def fit_record(work, cfg, seed, data_hash, *, method='riesz_softmax'):
     state = torch.load(work/'latest.pt', map_location='cpu', weights_only=False)
     manifest = json.loads((work/'manifest.json').read_text())
     for m in (manifest, state['manifest']):
-        if (m['config'] != cfg or m['seed'] != seed or m['method'] != 'riesz_softmax'
+        if (m['config'] != cfg or m['seed'] != seed or m['method'] != method
                 or m['data_sha256'] != data_hash or m['smoke_only']):
             raise ValueError(f'Incompatible fit: {work}')
     complete = state['epoch'] >= cfg['epochs'] or state['bad'] >= cfg['patience']

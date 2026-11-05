@@ -1,0 +1,12 @@
+{
+  "scope": "real-data development check, group 0 / seed 42 / LR .001 and .002; temperature fixed at development scale 4, not user scale 512",
+  "methods": [
+    "energy",
+    "riesz_softmax"
+  ],
+  "trials_completed": 4,
+  "original_energy_reused": true,
+  "temperature_sweep_riesz_reused": true,
+  "rerun_retrained": false,
+  "test_evaluation_run": false
+}
