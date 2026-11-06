@@ -1,0 +1,13 @@
+{
+  "scope": "real-data group-0 development integration, M=4 and 50, LR .001 / uniform scale 4; not production ten-group results",
+  "trained_lower_particle_models": 20,
+  "reused_50_particle_models": 20,
+  "validation_score_recomputed_with_50_samples": {
+    "energy": 0.0,
+    "riesz_uniform": 0.0
+  },
+  "test_scenarios_per_case": 50,
+  "timing_probe_executed": true,
+  "rerun_retrained": false,
+  "rerun_reevaluated": false
+}

@@ -25,6 +25,13 @@ def predict(model, inputs, indices, samples, generator):
     return model(*(inputs[k][indices] for k in ('mean', 'std', 'context')), z)
 
 
+def validation_sample_count(cfg):
+    count=cfg.get('validation_samples',cfg['train_samples'])
+    if not isinstance(count,int) or count<2:
+        raise ValueError('validation_samples must be an integer >=2')
+    return count
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--data', default='data/temperature10_group0.npz')
@@ -39,6 +46,7 @@ def main():
     p.add_argument('--resume', action='store_true')
     a = p.parse_args()
     cfg = yaml.safe_load(Path(a.config).read_text())
+    val_samples=validation_sample_count(cfg)
     torch.set_num_threads(a.threads)
     random.seed(a.seed); np.random.seed(a.seed); torch.manual_seed(a.seed)
     if a.device == 'cuda':
@@ -109,7 +117,7 @@ def main():
         vg = torch.Generator(device=a.device).manual_seed(cfg['validation_seed'])
         with torch.no_grad():
             for idx in torch.arange(len(inputs['val']['target']), device=a.device).split(cfg['batch_size']):
-                pred = predict(model, inputs['val'], idx, cfg['train_samples'], vg)
+                pred = predict(model, inputs['val'], idx, val_samples, vg)
                 val_sum += training_energy_score(pred, inputs['val']['target'][idx]).sum().item()
                 val_count += len(idx)
         val = val_sum / val_count

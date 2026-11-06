@@ -29,7 +29,7 @@
   },
   "experiment_files_sha256": {
     "prepare_data.py": "0d0f0b0505e8512c7c5595f0fd7e5e3e3a98b356ff0110df870150c4e76cd695",
-    "train.py": "2ab818bf09dcc10eee60d60b405ae4f5879f9050367bfe3d636522cf3a2bd1c4",
+    "train.py": "86451244f2e5b40bafab1cc847641b0e06d56030c816cee72cd00073569f5dce",
     "check_preprocessing.py": "8b8fa014cdd66aa1174882bacd948fb1e458f45c74dcdecba8af4a43d50ef2c5",
     "evaluate.py": "1ad7f8763006780f4d19b937ff77ce2a81ff9db263d4315b2c2b90a26f36176e",
     "weather/metrics.py": "e805cba78ca6d60f2f814e3d4b253af782fcb66d4f52d4881182fb69df73e1a6",
@@ -43,7 +43,8 @@
     "tune_learning_rate.py": "834c8aa3321b080e5890543f0d033e198a8207b208f24fb3ab3c0e2bb0b884c0",
     "evaluate_learning_rate.py": "69cb6346580d24cbdda7b2c380b1712171fb747be4097a9b163d11485ca678dd",
     "compare_uniform.py": "343ccd26730db77f6e5a9fd1d4ff2304f95ffebb32240cdaebd0fdad194c7cd8",
-    "weather/uniform_riesz.py": "6651aa6e59dd72d9e954804c95c55a71371fc1d2834b5e2b6be54269c95b3666"
+    "weather/uniform_riesz.py": "6651aa6e59dd72d9e954804c95c55a71371fc1d2834b5e2b6be54269c95b3666",
+    "compare_particles.py": "4bcd0b05f9b1b0d5e127492c637291e0edd22854bd1384e0ffcf14ff1c073329"
   },
   "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
 }

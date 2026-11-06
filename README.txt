@@ -261,6 +261,56 @@ differences are also stored. This is a controlled diagnostic at inherited
 settings, on the previously inspected 2016 test year, not a new untouched test.
 There is no automatic choice to replace softmax based on these test scores.
 
+TRAINING PARTICLE-COUNT ABLATION
+--------------------------------
+After the uniform comparison finishes:
+
+    nohup python -u compare_particles.py --device cpu > weather_particles.log 2>&1 &
+    tail -f weather_particles.log
+
+This compares energy-score training and exact-uniform Riesz with 50,16,8,4
+training predictions PER forecast case. A particle remains a complete vector
+across the ten stations. Each method keeps its frozen selected LR; uniform Riesz
+retains the same three normalization prefactors. Architecture, dates, station
+groups, batch of 64 cases, maximum epochs, patience and ten seeds are unchanged.
+No LR or other setting is retuned at the lower counts.
+
+Validation always generates 50 scenarios per model, even when training uses 4.
+It uses the same fixed validation noise and training-form energy score to select
+checkpoints. Final test evaluation is ALWAYS ten models x five scenarios = 50.
+Changing training count does not reduce the number of test ensemble members.
+The generator and shuffle are seeded as before, although the training noise
+stream consumes a different number of random values at each particle count.
+
+Completed 50-particle results are reused from:
+    runs/temperature_learning_rate_selected_test/groupXX/energy/evaluation/
+    runs/temperature_uniform_comparison/groupXX/evaluation/
+
+The default run covers the SAME ten groups (0-9) and ten seeds as before. This
+is a larger ablation: 600 new fits for lower counts; 200 50-particle fits reused.
+For a smaller initial run, explicitly use --groups 0 1 2 and a separate
+--workdir runs/temperature_particle_pilot. Absolute scores for that pilot cover
+three groups, not the earlier ten-group mean; compare rows within its own table.
+
+Quality results and a current-machine timing benchmark are saved separately:
+    runs/temperature_particle_comparison/summary.json
+    runs/temperature_particle_comparison/step_benchmark_cpu_2threads_20steps.json
+
+The benchmark uses the first group's reference seed, a batch of 64 training
+cases, and a fresh copy of that trained network at each count. It measures
+forward/loss/backward/Adam with 3 warmup and 20 timed steps. CUDA is synchronized
+when selected; CPU uses two threads by default. It excludes loading, validation,
+checkpoint saving and early stopping. Step speedup is NOT total-fit speedup;
+smaller ensembles can require more epochs and validation still costs the same.
+Reference weights are never modified by the isolated timing probe.
+
+Lower counts change estimator noise and the Riesz batch distance/RMS statistics;
+this is the inherited recipe at each count, not a pure variance-only change or
+an optimally retuned method. Results remain exploratory on the already inspected
+2016 test year. Rerun the identical command to resume. Different group/count sets
+require a new workdir. Metrics/evaluation inputs and checkpoint hashes are
+checked before reuse; original baseline runs are not overwritten.
+
 WHAT MATCHES
 ------------
 * Public temperature data: 48-hour ECMWF forecasts, 50 raw members.
