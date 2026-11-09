@@ -1,4 +1,4 @@
-"""Fixed-recipe particle ablation: energy vs uniform Riesz, with 50-scenario evaluation."""
+"""Fixed-recipe particle ablation, with 50-scenario evaluation and optional LVS."""
 import argparse
 import json
 from pathlib import Path
@@ -12,13 +12,18 @@ import yaml
 from compare_uniform import checked_reference
 from evaluate_learning_rate import validate_lr_selection, check_evaluation
 from evaluate_selected import validate_selection
+from evaluate_lvs import load_forecast
 from run_groups import ROOT, METRICS, read_json, run
 from train import load_split, predict, validation_sample_count
 from tune_temperature import digest, fit_record
 from weather.model import TemperatureCGM
 from weather.objectives import training_energy_score, riesz_loss
+from weather.local_variogram import (local_variogram, nearest_other_stations,
+                                    recover_coordinates, seasonal_climatology)
 
 METHODS=('energy','riesz_uniform')
+ALL_METHODS=('energy','riesz_softmax','riesz_uniform')
+LVS_METRICS=('local_variogram_anomaly','local_variogram_physical')
 
 
 def particle_config(reference,particles):
@@ -31,22 +36,59 @@ def particle_config(reference,particles):
     return cfg
 
 
-def summarize(rows,groups,particles):
+def summarize(rows,groups,particles,methods=METHODS,metrics=METRICS):
     scores=[]
-    for method in METHODS:
+    for method in methods:
         for count in particles:
             subset=[r for r in rows if r['method']==method and r['train_particles']==count]
             if subset:
                 scores.append({'method':method,'train_particles':count,'groups':len(subset),
-                               **{m:float(np.mean([r['metrics'][m] for r in subset])) for m in METRICS}})
-    expected={(g,m,n) for g in groups for m in METHODS for n in particles}
+                               **{m:float(np.mean([r['metrics'][m] for r in subset])) for m in metrics}})
+    expected={(g,m,n) for g in groups for m in methods for n in particles}
     actual=[(r['group'],r['method'],r['train_particles']) for r in rows]
-    if len(set(actual))!=len(actual) or not set(actual).issubset(expected):
+    if (len(set(actual))!=len(actual) or not set(actual).issubset(expected)
+            or any(not np.isfinite(r['metrics'][key]) for r in rows for key in metrics)):
         raise ValueError('Invalid/duplicate particle comparison cells')
     return {'complete':set(actual)==expected,'requested_groups':groups,'training_particles':particles,
             'models_per_method_per_group':10,'validation_scenarios_per_model':50,'test_scenarios_per_case':50,
             'group_mean_scores':scores,'cells':rows,
             'note':'Fixed inherited LR/settings, no particle-specific tuning. Previously inspected 2016 test year. Group means use equal weights.'}
+
+
+def benchmark_loss(pred,target,method,temperatures):
+    if method=='energy': return training_energy_score(pred,target).mean()
+    if method not in ALL_METHODS: raise ValueError('Unknown particle comparison method')
+    return riesz_loss(pred,target,temperatures,
+                      weighting='uniform' if method=='riesz_uniform' else 'softmax')[0].mean()
+
+
+def cached_lvs(directory,data_path,data_hash,method,output):
+    """Keep diagnostics separate from existing forecast outputs, including M=50."""
+    identity={'data_sha256':data_hash,'predictions_sha256':digest(directory/'predictions.npz'),
+              'metrics_sha256':digest(directory/'metrics.json'), 'method':method,
+              'protocol':{'neighbors':5,'exclude_center':True,'power':.5,'window':21,
+                          'climatology':'train-only 2007-2014; actual day-of-year, circular 366-day cycle, ddof=0'}}
+    if output.exists():
+        record=read_json(output)
+        if record['identity']!=identity: raise ValueError('Cached LVS input or protocol changed')
+        if digest(output.with_suffix('.npz'))!=record['per_case_sha256']:
+            raise ValueError('Cached per-case LVS changed')
+        return record['metrics']
+    with np.load(data_path,allow_pickle=False) as data:
+        pred,_=load_forecast(directory,data,data_hash,method)
+        meta=read_json(data_path.with_suffix('.json'))
+        neighbors=nearest_other_stations(*recover_coordinates(data,meta))
+        mean,std,_=seasonal_climatology(data['train_target'],data['train_dates'],data['test_dates'])
+        target=data['test_target'].astype(float)
+        physical=local_variogram(pred,target,neighbors)
+        anomaly=local_variogram((pred-mean[:,None])/std[:,None],(target-mean)/std,neighbors)
+        metrics={'local_variogram_anomaly':float(anomaly.mean()),'local_variogram_physical':float(physical.mean())}
+        output.parent.mkdir(parents=True,exist_ok=True)
+        np.savez_compressed(output.with_suffix('.npz'),dates=data['test_dates'],anomaly=anomaly,physical=physical,
+                            neighbors=neighbors,stations=meta['stations'],climatology_mean=mean,climatology_std=std)
+    output.write_text(json.dumps({'identity':identity,'metrics':metrics,
+                                 'per_case_sha256':digest(output.with_suffix('.npz'))},indent=2))
+    return metrics
 
 
 def benchmark(reference,data_path,method,counts,device,threads,steps):
@@ -71,8 +113,7 @@ def benchmark(reference,data_path,method,counts,device,threads,steps):
             opt.zero_grad(set_to_none=True)
             z=torch.randn(b,count,cfg['latent_dim'],device=device,generator=gen)
             pred=model(*(inputs[k] for k in ('mean','std','context')),z)
-            loss=(training_energy_score(pred,inputs['target']).mean() if method=='energy' else
-                  riesz_loss(pred,inputs['target'],cfg['temperatures'],weighting='uniform')[0].mean())
+            loss=benchmark_loss(pred,inputs['target'],method,cfg['temperatures'])
             if not torch.isfinite(loss): raise FloatingPointError('Nonfinite benchmark loss')
             loss.backward(); opt.step(); sync()
             if step>=3: timings.append(time.perf_counter()-start)
@@ -95,6 +136,9 @@ def main():
     p.add_argument('--selection',default='runs/temperature_learning_rate_sweep/lr_selection.json')
     p.add_argument('--energy-runs',default='runs/temperature_learning_rate_selected_test')
     p.add_argument('--uniform-runs',default='runs/temperature_uniform_comparison')
+    p.add_argument('--softmax-runs',default='runs/temperature_learning_rate_selected_test')
+    p.add_argument('--methods',nargs='+',choices=ALL_METHODS,default=list(METHODS))
+    p.add_argument('--with-lvs',action='store_true',help='Add source-checked anomaly/physical LVS to each comparison')
     p.add_argument('--groups',nargs='+',type=int,default=list(range(10)))
     p.add_argument('--particles',nargs='+',type=int,default=[50,16,8,4])
     p.add_argument('--device',choices=['cpu','cuda'],default='cpu')
@@ -107,9 +151,9 @@ def main():
     def absolute(path):
         path=Path(path)
         return (path if path.is_absolute() else ROOT/path).resolve()
-    if (len(set(a.groups))!=len(a.groups) or not all(0<=g<100 for g in a.groups)
+    if (not a.groups or len(set(a.groups))!=len(a.groups) or not all(0<=g<100 for g in a.groups)
             or len(set(a.particles))!=len(a.particles) or min(a.particles)<2
-            or a.benchmark_steps<1 or a.threads<1):
+            or len(set(a.methods))!=len(a.methods) or a.benchmark_steps<1 or a.threads<1):
         p.error('Use distinct valid groups/counts >=2, positive timing steps and CPU threads')
     torch.set_num_threads(a.threads)
     selection_path=absolute(a.selection); selection=read_json(selection_path)
@@ -120,11 +164,15 @@ def main():
     if digest(tp)!=selection['experiment']['temperature_selection_sha256']: raise ValueError('Temperature selection changed')
     tb,_,chosen=validate_selection(read_json(tp))
     if tb!=base or chosen!=selected['riesz_softmax']['temperatures']: raise ValueError('Temperature provenance mismatch')
-    references={'energy':selected['energy'],'riesz_uniform':selected['riesz_softmax']}
+    references={m:selected['energy' if m=='energy' else 'riesz_softmax'] for m in a.methods}
     for cfg in references.values(): particle_config(cfg,50)
     root=absolute(a.workdir); root.mkdir(parents=True,exist_ok=True)
     spec={'lr_selection_sha256':digest(selection_path),'groups':a.groups,'particles':a.particles,
           'reference_configs':references,'validation_samples':50,'test_samples':50}
+    if tuple(a.methods)!=METHODS or a.with_lvs:
+        spec.update(methods=a.methods,with_lvs=a.with_lvs,reference_paths={
+            m:str(absolute({'energy':a.energy_runs,'riesz_softmax':a.softmax_runs,'riesz_uniform':a.uniform_runs}[m]))
+            for m in a.methods})
     if (root/'experiment.json').exists() and read_json(root/'experiment.json')!=spec:
         raise ValueError('Workdir has a different frozen recipe/group/count set')
     (root/'experiment.json').write_text(json.dumps(spec,indent=2))
@@ -132,7 +180,8 @@ def main():
         dest=root/name
         if dest.exists() and dest.read_bytes()!=source.read_bytes(): raise ValueError('Frozen snapshot differs')
         dest.write_bytes(source.read_bytes())
-    rows=[]; bench_path=root/f'step_benchmark_{a.device}_{a.threads}threads_{a.benchmark_steps}steps.json'
+    suffix='' if tuple(a.methods)==METHODS else '_'+ '-'.join(a.methods)
+    rows=[]; bench_path=root/f'step_benchmark_{a.device}_{a.threads}threads_{a.benchmark_steps}steps{suffix}.json'
     print(f'Training particles {a.particles}; validation fixed at 50; evaluation 10 models x 5 scenarios.',flush=True)
     for index,group in enumerate(a.groups):
         print(f'Group {group} ({index+1}/{len(a.groups)})',flush=True)
@@ -142,26 +191,28 @@ def main():
         data_hash=digest(data); meta=read_json(data.with_suffix('.json'))
         if meta['station_group']!=group or len(meta['stations'])!=10: raise ValueError('Prepared group mismatch')
         paths={'energy':absolute(a.energy_runs)/f'group{group:02d}/energy/evaluation/metrics.json',
+               'riesz_softmax':absolute(a.softmax_runs)/f'group{group:02d}/riesz_softmax/evaluation/metrics.json',
                'riesz_uniform':absolute(a.uniform_runs)/f'group{group:02d}/evaluation/metrics.json'}
         cached={}; reference_prov={}
-        for method in METHODS:
+        for method in a.methods:
             cached[method],reference_prov[method]=checked_reference(paths[method],dict(references[method],group=group),data_hash,method)
         if index==0:
             if not bench_path.exists():
-                timings={m:benchmark(reference_prov[m][0]['checkpoint'],data,m,a.particles,a.device,a.threads,a.benchmark_steps) for m in METHODS}
+                timings={m:benchmark(reference_prov[m][0]['checkpoint'],data,m,a.particles,a.device,a.threads,a.benchmark_steps) for m in a.methods}
                 bench_path.write_text(json.dumps(timings,indent=2))
             else:
                 timings=read_json(bench_path)
-                for m in METHODS:
+                for m in a.methods:
                     if (timings[m]['reference_sha256']!=reference_prov[m][0]['checkpoint_sha256'] or timings[m]['data_sha256']!=data_hash
                             or [r['train_particles'] for r in timings[m]['rows']]!=a.particles):
                         raise ValueError('Cached step benchmark uses different reference/counts/data')
             print('Step benchmark saved to '+str(bench_path),flush=True)
-        for method in METHODS:
+        for method in a.methods:
             for count in a.particles:
                 cfg=particle_config(dict(references[method],group=group),count)
                 if count==50:
                     result=cached[method]; origin='completed_50_particle_reference'
+                    evaluation=paths[method].parent
                     print(f'  {method}, M=50: reusing completed reference',flush=True)
                 else:
                     cell=root/f'group{group:02d}'/method/f'particles{count}'
@@ -194,15 +245,29 @@ def main():
                                        [cached[method]['raw_ensemble_metrics'][m] for m in METRICS],rtol=1e-10,atol=1e-10):
                         raise ValueError('Raw evaluation protocol differs')
                     origin='new_particle_count_fit'
-                rows.append({'group':group,'method':method,'train_particles':count,'metrics':result['metrics'],
+                metrics=dict(result['metrics'])
+                if a.with_lvs:
+                    metrics.update(cached_lvs(evaluation,data,data_hash,method,
+                        root/f'group{group:02d}'/method/f'particles{count}'/'lvs.json'))
+                rows.append({'group':group,'method':method,'train_particles':count,'metrics':metrics,
                              'data_sha256':data_hash,'stations':meta['stations'],'cases':result['cases'],'origin':origin})
-                summary=summarize(rows,a.groups,a.particles); summary['step_benchmark']=str(bench_path)
+                summary=summarize(rows,a.groups,a.particles,a.methods,METRICS+LVS_METRICS if a.with_lvs else METRICS)
+                summary['step_benchmark']=str(bench_path)
                 summary['fixed_learning_rates']={m:c['learning_rate'] for m,c in references.items()}
+                summary['fixed_riesz_temperatures']=chosen
+                summary['timing_scope']='isolated training steps; fixed validation overhead and differing stopping epochs excluded'
+                if a.with_lvs: summary['lvs_protocol']='same five other neighbors and train-only 21-day anomalies as evaluate_lvs.py'
                 tmp=root/'summary.tmp'; tmp.write_text(json.dumps(summary,indent=2)); tmp.replace(root/'summary.json')
                 print(f'  {method}, M={count}: ES {result["metrics"]["energy_score"]:.4f}',flush=True)
-    print('\nMethod             Train M    Energy     Variogram       CRPS',flush=True)
+    print('\nMethod             Train M    Energy     Variogram       CRPS'+('   LVS anomaly   LVS physical' if a.with_lvs else ''),flush=True)
     for row in summary['group_mean_scores']:
-        print(f'{row["method"]:<18} {row["train_particles"]:>7} {row["energy_score"]:9.4f} {row["variogram_score"]:13.4f} {row["mean_crps"]:10.4f}',flush=True)
+        extra=f' {row["local_variogram_anomaly"]:13.6f} {row["local_variogram_physical"]:14.6f}' if a.with_lvs else ''
+        print(f'{row["method"]:<18} {row["train_particles"]:>7} {row["energy_score"]:9.4f} {row["variogram_score"]:13.4f} {row["mean_crps"]:10.4f}'+extra,flush=True)
+    print('\nIsolated training-step timing (first group; not total training time):',flush=True)
+    for method in a.methods:
+        for row in timings[method]['rows']:
+            speed=f'{row["step_speedup_vs_50"]:.2f}x' if 'step_speedup_vs_50' in row else 'n/a'
+            print(f'{method:<18} M={row["train_particles"]:<3} {1000*row["median_step_seconds"]:.3f} ms; relative to M=50: {speed}',flush=True)
     print(f'Summary: {root / "summary.json"}\nTiming: {bench_path}',flush=True)
 
 

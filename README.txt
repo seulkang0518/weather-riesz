@@ -438,6 +438,42 @@ There is no automatic choice to replace softmax based on these test scores.
 
 TRAINING PARTICLE-COUNT ABLATION
 --------------------------------
+Recommended first pass including softmax and local-dependence evaluation:
+
+    nohup python -u compare_particles.py --device cpu \
+      --methods energy riesz_softmax riesz_uniform \
+      --particles 50 8 4 --groups 0 1 2 --with-lvs \
+      --workdir runs/temperature_particle_lvs_pilot \
+      > weather_particle_lvs.log 2>&1 &
+    tail -f weather_particle_lvs.log
+
+This pilot adds 180 fits: three methods x two reduced counts x three groups x
+ten seeds. All 90 completed 50-particle fits are reused. Both Riesz variants
+use the previous frozen scale-512 setting ([102.4,25.6,10.24]); this is NOT the
+scale-64 LVS-selected setting. LR stays .0005 at the current frozen selection.
+No temperatures/LR are retuned for any particle count. Softmax and uniform
+are both included to test whether their behavior changes with fewer neighbors.
+
+The pilot keeps ten seeds and final 50-scenario forecasts for each method/count;
+only its group coverage is smaller. Compare counts against M=50 IN THE SAME
+pilot table, not against the earlier ten-group averages. Absolute scores can
+differ simply because only three station groups are included.
+
+--with-lvs adds anomaly and physical LVS using the same five-other-station and
+training-only seasonal-climatology conventions as evaluate_lvs.py. The saved
+forecast integrity checks are applied before computing LVS. Diagnostics and
+per-case arrays are saved under each group/method/particlesN/lvs.json and .npz,
+separately from the existing reference forecasts. SHA256s reject stale or changed
+forecast/cache inputs. The summary reports ES, full-group VS, CRPS and both LVS
+variants, plus a separate per-method/count isolated training-step benchmark.
+
+    runs/temperature_particle_lvs_pilot/summary.json
+
+Review this pilot before extending group coverage or adding another count.
+Changing --groups/--particles/--methods requires a new --workdir; do not modify
+the experiment manifest of a completed or running ablation.
+
+Original two-method runner (unchanged defaults, no LVS):
 After the uniform comparison finishes:
 
     nohup python -u compare_particles.py --device cpu > weather_particles.log 2>&1 &

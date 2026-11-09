@@ -44,7 +44,7 @@
     "evaluate_learning_rate.py": "69cb6346580d24cbdda7b2c380b1712171fb747be4097a9b163d11485ca678dd",
     "compare_uniform.py": "343ccd26730db77f6e5a9fd1d4ff2304f95ffebb32240cdaebd0fdad194c7cd8",
     "weather/uniform_riesz.py": "6651aa6e59dd72d9e954804c95c55a71371fc1d2834b5e2b6be54269c95b3666",
-    "compare_particles.py": "4bcd0b05f9b1b0d5e127492c637291e0edd22854bd1384e0ffcf14ff1c073329",
+    "compare_particles.py": "7e20a280bd79153d33e9365df9d3cf7701cf2dfc72c3ae63e18a2e07fb207ce8",
     "evaluate_lvs.py": "0582c3b6ae6848e546edfd430d5e6e2ebc01433db4971ec97a1e4053b49a1bff",
     "weather/local_variogram.py": "d225dc82234a12ebc63d68ad4eb4d653b96fe8d823157c0f0fcd693e22150af7",
     "tune_temperature_lvs.py": "518814cbf0ae8c9353a97eef7593a1459a3f5068c1ff9b6071f0d20ebbe46a9e",

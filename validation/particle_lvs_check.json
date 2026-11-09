@@ -1,0 +1,11 @@
+{
+  "scope": "development group0 with LR .001 / scale4; not production scale512 LR .0005 results",
+  "new_softmax_M4_fits": 10,
+  "test_scenarios_per_case": 50,
+  "all_three_M50_references_reused": true,
+  "M50_LVS_matches_existing_evaluator": true,
+  "resume_preserves_model_forecast_and_LVS_cache_mtimes": true,
+  "M4_checkpoint_revalidated_with_50_samples": true,
+  "M4_validation_training_form_ES": 3.2771064524531033,
+  "unit_tests": 28
+}
