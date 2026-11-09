@@ -1,6 +1,7 @@
 import pytest
 from compare_particles import particle_config,summarize,benchmark_loss,cached_lvs,ALL_METHODS,LVS_METRICS
 from train import validation_sample_count
+from compare_particles import validate_reuse_spec,reused_particle_cell
 
 
 def test_particle_change_keeps_validation_fixed_and_reference_config_compatible():
@@ -88,3 +89,50 @@ def test_particle_lvs_cache_uses_same_forecasts_and_rejects_changed_identity(tmp
     (directory/'metrics.json').write_text('{"changed":true}')
     with pytest.raises(ValueError,match='Cached LVS input'):
         cached_lvs(directory,data,'fixed-data-hash','energy',output)
+
+
+def test_reuse_accepts_completed_group_subset_but_rejects_recipe_or_summary_changes():
+    from copy import deepcopy
+    previous={'lr_selection_sha256':'fixed','groups':[0,1],'particles':[50,4],
+              'reference_configs':{'energy':{'learning_rate':.0005}},'validation_samples':50,'test_samples':50,
+              'methods':['energy'],'with_lvs':True,'reference_paths':{'energy':'/reference'}}
+    rows=[{'group':g,'method':'energy','train_particles':n,
+           'metrics':dict.fromkeys(('energy_score','variogram_score','mean_crps')+LVS_METRICS,float(g+n))}
+          for g in (0,1) for n in (50,4)]
+    summary=summarize(rows,[0,1],[50,4],['energy'],('energy_score','variogram_score','mean_crps')+LVS_METRICS)
+    current=dict(previous,groups=list(range(10)))
+    index=validate_reuse_spec(previous,summary,current)
+    assert len(index)==4 and (0,'energy',4) in index and (3,'energy',4) not in index
+    bad=deepcopy(current); bad['reference_configs']['energy']['learning_rate']=.001
+    with pytest.raises(ValueError,match='recipe mismatch'): validate_reuse_spec(previous,summary,bad)
+    bad=deepcopy(current); bad['particles']=[50,8,4]
+    with pytest.raises(ValueError,match='recipe mismatch'): validate_reuse_spec(previous,summary,bad)
+    bad=deepcopy(current); bad['with_lvs']=False
+    with pytest.raises(ValueError,match='protocol mismatch'): validate_reuse_spec(previous,summary,bad)
+    bad=deepcopy(summary); bad['complete']=False
+    with pytest.raises(ValueError,match='incomplete'): validate_reuse_spec(previous,bad,current)
+    bad=deepcopy(summary); bad['group_mean_scores'][0]['energy_score']+=1
+    with pytest.raises(ValueError,match='inconsistent'): validate_reuse_spec(previous,bad,current)
+
+
+def test_read_only_particle_reuse_rejects_changed_checkpoints(tmp_path,monkeypatch):
+    import json
+    import compare_particles as module
+    cell=tmp_path/'cell'; (cell/'evaluation').mkdir(parents=True)
+    cfg={'train_samples':4,'validation_samples':50}; reference=[{'checkpoint_sha256':'reference'}]
+    record={'checkpoint':str(cell/'seed42/best.pt'),'checkpoint_sha256':'frozen',
+            'best_epoch':2,'validation_energy':3.,'stopped_epoch':12}
+    frozen={'fits':[dict(record,seed=42)],'reference_50':reference}
+    pf=cell/'checkpoint_provenance.json'; pf.write_text(json.dumps(frozen))
+    (cell/'evaluation/metrics.json').write_text('{}')
+    before=pf.stat().st_mtime_ns
+    monkeypatch.setattr(module,'fit_record',lambda *args,**kwargs:dict(record))
+    monkeypatch.setattr(module,'check_evaluation',lambda *args:None)
+    evaluation,_=reused_particle_cell(cell,cfg,'hash','energy',[42],reference)
+    assert evaluation==cell/'evaluation' and pf.stat().st_mtime_ns==before
+    monkeypatch.setattr(module,'fit_record',lambda *args,**kwargs:dict(record,checkpoint_sha256='changed'))
+    with pytest.raises(ValueError,match='checkpoint identity'):
+        reused_particle_cell(cell,cfg,'hash','energy',[42],reference)
+    monkeypatch.setattr(module,'fit_record',lambda *args,**kwargs:None)
+    with pytest.raises(ValueError,match='incomplete'):
+        reused_particle_cell(cell,cfg,'hash','energy',[42],reference)

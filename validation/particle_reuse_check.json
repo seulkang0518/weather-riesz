@@ -1,0 +1,11 @@
+{
+  "scope": "development group0 softmax M=50/4, LR .001, scale4; not production results",
+  "source_run": "runs/particles_softmax_lvs_check",
+  "destination_run": "runs/particles_reuse_check",
+  "source_files_unchanged_including_mtimes": 64,
+  "new_training_or_sampling": false,
+  "summary_metrics_match_source_exactly": true,
+  "isolated_benchmark_reused_exactly": true,
+  "resume_check_passed": true,
+  "unit_tests": 30
+}

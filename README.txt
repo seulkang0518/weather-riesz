@@ -473,6 +473,43 @@ Review this pilot before extending group coverage or adding another count.
 Changing --groups/--particles/--methods requires a new --workdir; do not modify
 the experiment manifest of a completed or running ablation.
 
+Extend a completed pilot to all ten groups without repeating pilot training:
+
+    nohup python -u compare_particles.py --device cpu \
+      --methods energy riesz_softmax riesz_uniform \
+      --particles 50 8 4 --groups 0 1 2 3 4 5 6 7 8 9 --with-lvs \
+      --reuse-run runs/temperature_particle_lvs_pilot \
+      --workdir runs/temperature_particle_lvs_full \
+      > weather_particle_lvs_full.log 2>&1 &
+    tail -f weather_particle_lvs_full.log
+
+This adds 420 fits: seven additional groups x three methods x two reduced counts
+x ten seeds. Groups 0-2 reuse all 180 completed reduced-count fits and saved
+forecasts. All groups reuse the completed M=50 reference models/forecasts. The
+pilot directory remains read-only; there is no refitting, resampling, copying
+large model files, or rewriting of pilot manifests. Cheap LVS arithmetic is
+recomputed from the pilot's saved forecasts into the new output directory and
+checked against frozen pilot scores. Compatible first-group timing results are
+reused from the pilot, not presented as a new end-to-end timing measurement.
+
+--reuse-run requires a complete pilot, identical frozen LR selection, reference
+configs/paths, methods, particle counts and validation/test sample budgets. The
+group list may differ. It validates every reused fit, checkpoint identity,
+reference identity and forecast score against the pilot. Incompatible/incomplete
+source runs are rejected, never resumed or repaired. Source and destination must
+be separate nonnested directories. Frozen pilot experiment/summary snapshots
+and SHA256s are retained in the destination. Re-run the same full-run command
+to resume only the newly added work.
+
+    runs/temperature_particle_lvs_full/summary.json
+
+The summary includes combined equal-group means over all ten groups and
+additional_groups_comparison for groups 3-9 only. Both tables are printed.
+This is a fixed-recipe extension after inspecting the pilot, without further
+temperature/LR/count selection. The seven groups were not in the particle
+pilot, but station groups can overlap and 2016 was inspected in earlier work;
+they are not an independent untouched holdout or a significance test.
+
 Original two-method runner (unchanged defaults, no LVS):
 After the uniform comparison finishes:
 

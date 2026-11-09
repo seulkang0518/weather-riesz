@@ -55,6 +55,43 @@ def summarize(rows,groups,particles,methods=METHODS,metrics=METRICS):
             'note':'Fixed inherited LR/settings, no particle-specific tuning. Previously inspected 2016 test year. Group means use equal weights.'}
 
 
+def validate_reuse_spec(previous,summary,current):
+    """Reuse a complete earlier group subset only, with the same frozen recipe."""
+    for key in ('lr_selection_sha256','particles','reference_configs','validation_samples','test_samples'):
+        if previous[key]!=current[key]: raise ValueError(f'Particle reuse recipe mismatch: {key}')
+    for key,default in (('methods',list(METHODS)),('with_lvs',False),('reference_paths',None)):
+        if previous.get(key,default)!=current.get(key,default):
+            raise ValueError(f'Particle reuse protocol mismatch: {key}')
+    groups=previous['groups']; methods=previous.get('methods',list(METHODS))
+    metrics=METRICS+LVS_METRICS if previous.get('with_lvs',False) else METRICS
+    if not groups or len(set(groups))!=len(groups) or not all(0<=g<100 for g in groups):
+        raise ValueError('Invalid prior particle groups')
+    reconstructed=summarize(summary['cells'],groups,previous['particles'],methods,metrics)
+    if (not summary['complete'] or not reconstructed['complete'] or summary['requested_groups']!=groups
+            or summary['training_particles']!=previous['particles']
+            or summary['group_mean_scores']!=reconstructed['group_mean_scores']
+            or summary['validation_scenarios_per_model']!=50 or summary['test_scenarios_per_case']!=50):
+        raise ValueError('Prior particle comparison is incomplete or inconsistent')
+    return {(r['group'],r['method'],r['train_particles']):r for r in summary['cells']}
+
+
+def reused_particle_cell(cell,cfg,data_hash,method,seeds,reference_provenance):
+    """Read-only validation: do not resume/refit or rewrite any prior-run file."""
+    saved=read_json(cell/'checkpoint_provenance.json')
+    records=[]
+    for seed in seeds:
+        work=cell/f'seed{seed}'
+        record=fit_record(work,cfg,seed,data_hash,method=method)
+        if record is None: raise ValueError('Prior particle fit is incomplete; refuse to modify it')
+        records.append(dict(record,seed=seed))
+    if saved!={'fits':records,'reference_50':reference_provenance}:
+        raise ValueError('Prior particle checkpoint identity or M=50 reference changed')
+    evaluation=cell/'evaluation'
+    result=read_json(evaluation/'metrics.json')
+    check_evaluation(result,method,data_hash,seeds,records)
+    return evaluation,result
+
+
 def benchmark_loss(pred,target,method,temperatures):
     if method=='energy': return training_energy_score(pred,target).mean()
     if method not in ALL_METHODS: raise ValueError('Unknown particle comparison method')
@@ -147,6 +184,7 @@ def main():
     p.add_argument('--data-dir',default='data')
     p.add_argument('--source',default='data/temperature_data_cgm_std.feather')
     p.add_argument('--workdir',default='runs/temperature_particle_comparison')
+    p.add_argument('--reuse-run',help='Read-only reuse of a completed compatible pilot; choose a new workdir')
     a=p.parse_args()
     def absolute(path):
         path=Path(path)
@@ -166,23 +204,46 @@ def main():
     if tb!=base or chosen!=selected['riesz_softmax']['temperatures']: raise ValueError('Temperature provenance mismatch')
     references={m:selected['energy' if m=='energy' else 'riesz_softmax'] for m in a.methods}
     for cfg in references.values(): particle_config(cfg,50)
-    root=absolute(a.workdir); root.mkdir(parents=True,exist_ok=True)
+    root=absolute(a.workdir)
     spec={'lr_selection_sha256':digest(selection_path),'groups':a.groups,'particles':a.particles,
           'reference_configs':references,'validation_samples':50,'test_samples':50}
     if tuple(a.methods)!=METHODS or a.with_lvs:
         spec.update(methods=a.methods,with_lvs=a.with_lvs,reference_paths={
             m:str(absolute({'energy':a.energy_runs,'riesz_softmax':a.softmax_runs,'riesz_uniform':a.uniform_runs}[m]))
             for m in a.methods})
+    prior_root=None; prior_cells={}; prior_groups=[]; prior_summary=None
+    if a.reuse_run:
+        prior_root=absolute(a.reuse_run)
+        if root==prior_root or root.is_relative_to(prior_root) or prior_root.is_relative_to(root):
+            raise ValueError('Reuse source and output must be separate, nonnested directories')
+        prior_spec=read_json(prior_root/'experiment.json'); prior_summary=read_json(prior_root/'summary.json')
+        prior_cells=validate_reuse_spec(prior_spec,prior_summary,spec)
+        if digest(prior_root/'frozen_lr_selection.json')!=spec['lr_selection_sha256']:
+            raise ValueError('Prior frozen LR snapshot changed')
+        if digest(prior_root/'frozen_temperature_selection.json')!=digest(tp):
+            raise ValueError('Prior frozen temperature snapshot changed')
+        prior_groups=[g for g in a.groups if g in prior_spec['groups']]
+        if not prior_groups: raise ValueError('No requested groups overlap with the reuse source')
+        spec['reuse_run']={'directory':str(prior_root),'experiment_sha256':digest(prior_root/'experiment.json'),
+                           'summary_sha256':digest(prior_root/'summary.json')}
     if (root/'experiment.json').exists() and read_json(root/'experiment.json')!=spec:
         raise ValueError('Workdir has a different frozen recipe/group/count set')
+    root.mkdir(parents=True,exist_ok=True)
     (root/'experiment.json').write_text(json.dumps(spec,indent=2))
     for source,name in [(selection_path,'frozen_lr_selection.json'),(tp,'frozen_temperature_selection.json')]:
         dest=root/name
         if dest.exists() and dest.read_bytes()!=source.read_bytes(): raise ValueError('Frozen snapshot differs')
         dest.write_bytes(source.read_bytes())
+    if prior_root:
+        for name in ('experiment.json','summary.json'):
+            dest=root/('frozen_reuse_'+name)
+            if dest.exists() and dest.read_bytes()!=(prior_root/name).read_bytes():
+                raise ValueError('Frozen pilot snapshot differs')
+            dest.write_bytes((prior_root/name).read_bytes())
     suffix='' if tuple(a.methods)==METHODS else '_'+ '-'.join(a.methods)
     rows=[]; bench_path=root/f'step_benchmark_{a.device}_{a.threads}threads_{a.benchmark_steps}steps{suffix}.json'
     print(f'Training particles {a.particles}; validation fixed at 50; evaluation 10 models x 5 scenarios.',flush=True)
+    if prior_root: print(f'Read-only reuse of groups {prior_groups} from {prior_root}',flush=True)
     for index,group in enumerate(a.groups):
         print(f'Group {group} ({index+1}/{len(a.groups)})',flush=True)
         data=absolute(a.data_dir)/f'temperature10_group{group}.npz'
@@ -198,7 +259,18 @@ def main():
             cached[method],reference_prov[method]=checked_reference(paths[method],dict(references[method],group=group),data_hash,method)
         if index==0:
             if not bench_path.exists():
-                timings={m:benchmark(reference_prov[m][0]['checkpoint'],data,m,a.particles,a.device,a.threads,a.benchmark_steps) for m in a.methods}
+                prior_bench=Path(prior_summary['step_benchmark']) if prior_summary else None
+                if prior_bench is not None and not prior_bench.is_absolute(): prior_bench=absolute(prior_bench)
+                if prior_bench is not None and group in prior_groups and prior_bench.name==bench_path.name:
+                    timings=read_json(prior_bench)
+                else:
+                    timings={m:benchmark(reference_prov[m][0]['checkpoint'],data,m,a.particles,a.device,a.threads,a.benchmark_steps) for m in a.methods}
+                for m in a.methods:
+                    if (timings[m]['reference_sha256']!=reference_prov[m][0]['checkpoint_sha256'] or timings[m]['data_sha256']!=data_hash
+                            or [r['train_particles'] for r in timings[m]['rows']]!=a.particles
+                            or timings[m]['device']!=a.device or timings[m]['cpu_threads']!=a.threads
+                            or timings[m]['measured_steps']!=a.benchmark_steps):
+                        raise ValueError('Reused step benchmark has another reference/count/data/device protocol')
                 bench_path.write_text(json.dumps(timings,indent=2))
             else:
                 timings=read_json(bench_path)
@@ -210,10 +282,17 @@ def main():
         for method in a.methods:
             for count in a.particles:
                 cfg=particle_config(dict(references[method],group=group),count)
+                prior=prior_cells.get((group,method,count))
+                if prior and prior['data_sha256']!=data_hash: raise ValueError('Prepared data differs from pilot')
                 if count==50:
                     result=cached[method]; origin='completed_50_particle_reference'
                     evaluation=paths[method].parent
                     print(f'  {method}, M=50: reusing completed reference',flush=True)
+                elif prior is not None:
+                    old_cell=prior_root/f'group{group:02d}'/method/f'particles{count}'
+                    evaluation,result=reused_particle_cell(old_cell,cfg,data_hash,method,base['seeds'],reference_prov[method])
+                    origin='reused_completed_pilot'
+                    print(f'  {method}, M={count}: reusing completed pilot fits and forecasts',flush=True)
                 else:
                     cell=root/f'group{group:02d}'/method/f'particles{count}'
                     cell.mkdir(parents=True,exist_ok=True); cp=cell/'config.yaml'
@@ -249,6 +328,12 @@ def main():
                 if a.with_lvs:
                     metrics.update(cached_lvs(evaluation,data,data_hash,method,
                         root/f'group{group:02d}'/method/f'particles{count}'/'lvs.json'))
+                if prior is not None:
+                    if prior['stations']!=meta['stations'] or prior['cases']!=result['cases']:
+                        raise ValueError('Pilot station/case alignment changed')
+                    for key,value in metrics.items():
+                        if not np.isclose(value,prior['metrics'][key],rtol=1e-10,atol=1e-10):
+                            raise ValueError('Reused forecast scores differ from frozen pilot')
                 rows.append({'group':group,'method':method,'train_particles':count,'metrics':metrics,
                              'data_sha256':data_hash,'stations':meta['stations'],'cases':result['cases'],'origin':origin})
                 summary=summarize(rows,a.groups,a.particles,a.methods,METRICS+LVS_METRICS if a.with_lvs else METRICS)
@@ -257,12 +342,26 @@ def main():
                 summary['fixed_riesz_temperatures']=chosen
                 summary['timing_scope']='isolated training steps; fixed validation overhead and differing stopping epochs excluded'
                 if a.with_lvs: summary['lvs_protocol']='same five other neighbors and train-only 21-day anomalies as evaluate_lvs.py'
+                if prior_root:
+                    summary['reuse_run']=spec['reuse_run']; summary['reused_groups']=prior_groups
+                    additional=[g for g in a.groups if g not in prior_groups]
+                    summary['additional_groups']=additional
+                    if additional:
+                        summary['additional_groups_comparison']=summarize(
+                            [r for r in rows if r['group'] in additional],additional,a.particles,a.methods,
+                            METRICS+LVS_METRICS if a.with_lvs else METRICS)
                 tmp=root/'summary.tmp'; tmp.write_text(json.dumps(summary,indent=2)); tmp.replace(root/'summary.json')
                 print(f'  {method}, M={count}: ES {result["metrics"]["energy_score"]:.4f}',flush=True)
     print('\nMethod             Train M    Energy     Variogram       CRPS'+('   LVS anomaly   LVS physical' if a.with_lvs else ''),flush=True)
     for row in summary['group_mean_scores']:
         extra=f' {row["local_variogram_anomaly"]:13.6f} {row["local_variogram_physical"]:14.6f}' if a.with_lvs else ''
         print(f'{row["method"]:<18} {row["train_particles"]:>7} {row["energy_score"]:9.4f} {row["variogram_score"]:13.4f} {row["mean_crps"]:10.4f}'+extra,flush=True)
+    if summary.get('additional_groups'):
+        print('\nAdditional groups only (excluding the reused particle pilot): '+str(summary['additional_groups']),flush=True)
+        print('Method             Train M    Energy     Variogram       CRPS'+('   LVS anomaly   LVS physical' if a.with_lvs else ''),flush=True)
+        for row in summary['additional_groups_comparison']['group_mean_scores']:
+            extra=f' {row["local_variogram_anomaly"]:13.6f} {row["local_variogram_physical"]:14.6f}' if a.with_lvs else ''
+            print(f'{row["method"]:<18} {row["train_particles"]:>7} {row["energy_score"]:9.4f} {row["variogram_score"]:13.4f} {row["mean_crps"]:10.4f}'+extra,flush=True)
     print('\nIsolated training-step timing (first group; not total training time):',flush=True)
     for method in a.methods:
         for row in timings[method]['rows']:
