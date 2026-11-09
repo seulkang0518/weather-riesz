@@ -294,6 +294,63 @@ The upstream repository has no declared license at inspection; its files are
 not redistributed here. Our evaluator independently implements the published
 score formula and adds benchmark-specific validation/preprocessing.
 
+SMALLER TEMPERATURES: VALIDATION LVS AND WEIGHT CONCENTRATION
+----------------------------------------------------------
+    nohup python -u tune_temperature_lvs.py --device cpu > weather_temperature_lvs.log 2>&1 &
+    tail -f weather_temperature_lvs.log
+
+This is a new, explicitly exploratory temperature comparison motivated by LVS.
+It retains the Riesz softmax training objective and the existing ES-based best
+checkpoint/early-stopping rule. It changes only the temperature list between
+training candidates. The learning rate is inherited from the frozen Riesz LR
+choice (currently .0005), with 50 train/validation predictions, identical model,
+initialization seeds, training/noise seeds, batch size and budget.
+
+Default multipliers of [.2,.05,.02] are 1, 4, 16, 64, 512:
+    1:   [.2,.05,.02]
+    4:   [.8,.2,.08]
+    16:  [3.2,.8,.32]
+    64:  [12.8,3.2,1.28]
+    512: [102.4,25.6,10.24]   (current reference)
+
+Three groups (0-2) x three seeds (42-44) x five candidates = 45 fits. Nine
+compatible scale-512 fits are reused from the frozen LR sweep at the current
+settings, so 36 new fits are needed. Previous smaller-temperature fits at LR
+.001 are NOT reused at .0005. The runner verifies the frozen LR/temperature
+provenance chain and hashes/configs of reused checkpoints. Missing prepared
+group files must be prepared separately; this runner does not download data.
+
+Each selected checkpoint is scored using fixed-noise 2015 validation samples.
+The primary ranking is equal-group mean per-seed anomaly LVS; empirical ES and
+CRPS are also recorded. Climatology uses 2007-2014 training observations only,
+and the same five-neighbor/21-day conventions as evaluate_lvs.py. These are
+per-seed 50-member validation scores, not the ten-model x five-member final
+test ensemble. Checkpoint selection still uses ES, so this does not search for
+the best LVS epoch or train with LVS. The older sweep selected temperatures by
+ES, so a different winner can reflect a different metric, not an error before.
+
+For each temperature the runner reports effective repulsion-neighbor count
+ESS = 1/sum_j(weight_j^2), after excluding self. With 50 particles:
+    ESS near 49: nearly uniform weights across other generated particles.
+    ESS near 1: weight concentrated on one neighbor.
+It also records mean maximum weight and ESS/49. Diagnostics exactly reproduce
+the upstream detached batch-distance scaling and coordinate floor; batches
+match validation's batch size. ESS describes weights, not statistical sample
+independence or the final RMS-normalized combined movement. Positive attraction
+has only one observed target and hence weight 1 at every temperature.
+
+Output:
+    runs/temperature_lvs_validation_sweep/selection.json
+    runs/temperature_lvs_validation_sweep/selected_config.yaml
+
+Re-run the same command to resume; completed fits and validation computations
+are reused with identity checks. Change --workdir for a different group/seed/grid.
+No 2016 prediction arrays or test metrics are loaded and no test evaluation is
+run. Training histories/checkpoints are retained. Test evaluation, if desired,
+is a separate next step after freezing this validation choice; the 2016 test
+year has already been inspected repeatedly and is not an untouched holdout.
+Riesz has additional metric/temperature tuning effort relative to energy.
+
 EXACT UNIFORM-WEIGHT ABLATION
 ----------------------------
 After the tuned-LR ten-group comparison has finished:

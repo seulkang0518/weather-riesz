@@ -1,0 +1,10 @@
+{
+  "development_only": true,
+  "selection": "runs/temperature_lvs_check/selection.json",
+  "new_training_fits": 1,
+  "reused_frozen_fits": 1,
+  "resume_checkpoint_and_validation_cache_mtimes_unchanged": true,
+  "test_evaluated": false,
+  "unit_tests": 24,
+  "diagnostic_parity": "tests/test_temperature_lvs.py directly compares ESS against upstream _softmax_toward with the wrapper distance-scale epsilon and floor"
+}
