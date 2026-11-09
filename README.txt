@@ -221,6 +221,79 @@ and evaluation records are validated before reuse. The comparison is still
 an exploratory follow-up on the previously inspected 2016 test year; the two
 methods have matched LR grids but unequal total historical tuning effort.
 
+LOCAL VARIOGRAM EVALUATION OF EXISTING FORECASTS
+---------------------------------------------
+After the tuned-LR comparison and uniform ablation have completed:
+
+    python -u evaluate_lvs.py
+
+This evaluates the saved predictions from:
+    runs/temperature_learning_rate_selected_test/groupXX/energy/evaluation
+    runs/temperature_learning_rate_selected_test/groupXX/riesz_softmax/evaluation
+    runs/temperature_uniform_comparison/groupXX/evaluation
+
+No training, checkpoint loading, noise sampling or GPU is needed. Defaults use
+groups 0-9. Override --energy-runs, --riesz-runs, --uniform-runs for other saved
+comparisons, or --skip-uniform to compare only energy and Riesz softmax. These
+paths should have the same groupXX/.../evaluation layout. --groups 0 is a pilot.
+
+Outputs (new directory required; existing results are preserved):
+    runs/temperature_lvs_comparison/summary.json
+    runs/temperature_lvs_comparison/per_case_scores.npz
+
+The evaluator follows the LVS arithmetic in David Landry's public sidown code,
+at publication-era revision 5396f9f5ecb673394b532c80a3e4922d842d1c78:
+https://github.com/davidlandry93/sidown
+Paper: https://arxiv.org/abs/2504.03463
+
+Important code-level details:
+* Choose five nearest OTHER stations for each center, excluding the center.
+  Distances use spherical great-circle ordering, not observation correlations.
+* Take the square root of each absolute station-pair temperature difference
+  (variogram power p=.5), then average this over ensemble members BEFORE
+  subtracting the observed difference and squaring.
+* Sum all ordered pairs inside the five-station neighborhood. Do not divide
+  by 25. The diagonal is zero; off-diagonal pairs occur in both directions.
+* Average the neighborhood scores over centers and cases, then average groups
+  equally, following our existing comparison's group aggregation.
+
+Primary metric: local_variogram_anomaly. As in the author's EUPP evaluator,
+predictions and observations are transformed to standardized seasonal anomalies
+before computing LVS. Our adaptation fits station-wise population mean/std
+using only 2007-2014 training observations in wrapped 21-day ordinal-day windows.
+It uses a 366-day cycle with actual day-of-year (retaining leap-year shifts),
+and requires at least 20% of window-length x training-year-count observations.
+It rejects zero/invalid standard deviations. Validation/test observations never
+fit climatology. Companion local_variogram_physical uses raw temperature units.
+
+This is NOT the paper's full benchmark reproduction: that work uses EUPPBench's
+full 122-station network, reforecast climatology, multiple lead times and both
+temperature and wind. Our existing models generate ten stations at one lead time,
+so five-neighbor selection is restricted to each ten-station model group and we
+evaluate temperature only. Overlapping groups repeat some geographic locations.
+Their numeric table values should not be compared directly with our scores.
+
+Coordinates are recovered from the existing standardized training context using
+the saved lat/lon scalers, checked to be static. No prepared dataset is rewritten
+(existing checkpoint hashes stay valid). Saved prediction targets/dates must
+match the hashed prepared data exactly, and existing ES/VS/CRPS are recomputed
+to check file integrity. Input SHA256s and neighborhood station IDs are saved.
+
+No LVS-based hyperparameter selection is performed. This is an exploratory
+diagnostic on already inspected 2016 forecasts, not a fresh confirmation set.
+LVS supplements ES/CRPS; it is insensitive to common additive shifts and is
+not a strictly identifying distributional metric by itself. A lower LVS is not
+proof that the entire conditional predictive distribution is better.
+
+Validation: tests/test_lvs.py covers ordered-pair arithmetic, geographic self
+exclusion/ties, training-only seasonal windows, coordinate order, and rejection
+of misaligned saved forecasts. validation/lvs_check.json records a direct
+comparison against the original upstream xarray function extracted via AST;
+maximum absolute discrepancy on a fixed synthetic example is 2.7e-15.
+The upstream repository has no declared license at inspection; its files are
+not redistributed here. Our evaluator independently implements the published
+score formula and adds benchmark-specific validation/preprocessing.
+
 EXACT UNIFORM-WEIGHT ABLATION
 ----------------------------
 After the tuned-LR ten-group comparison has finished:

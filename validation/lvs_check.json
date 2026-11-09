@@ -1,0 +1,15 @@
+{
+  "source_repository": "https://github.com/davidlandry93/sidown",
+  "revision": "5396f9f5ecb673394b532c80a3e4922d842d1c78",
+  "metric_file_sha256": "a5b3b75b12860475557cee657df7a15576b6fe8d7d642a9ed09d40616044eb2a",
+  "direct_upstream_function_parity_max_abs": 2.6645352591003757e-15,
+  "upstream_function_extracted_via_ast": true,
+  "dimensions": {
+    "cases": 8,
+    "members": 9,
+    "stations": 10,
+    "neighbors": 5
+  },
+  "real_saved_forecast_check": "runs/lvs_check/summary.json; development group0 fits, not production scores",
+  "unit_tests": 22
+}

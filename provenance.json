@@ -44,7 +44,19 @@
     "evaluate_learning_rate.py": "69cb6346580d24cbdda7b2c380b1712171fb747be4097a9b163d11485ca678dd",
     "compare_uniform.py": "343ccd26730db77f6e5a9fd1d4ff2304f95ffebb32240cdaebd0fdad194c7cd8",
     "weather/uniform_riesz.py": "6651aa6e59dd72d9e954804c95c55a71371fc1d2834b5e2b6be54269c95b3666",
-    "compare_particles.py": "4bcd0b05f9b1b0d5e127492c637291e0edd22854bd1384e0ffcf14ff1c073329"
+    "compare_particles.py": "4bcd0b05f9b1b0d5e127492c637291e0edd22854bd1384e0ffcf14ff1c073329",
+    "evaluate_lvs.py": "0582c3b6ae6848e546edfd430d5e6e2ebc01433db4971ec97a1e4053b49a1bff",
+    "weather/local_variogram.py": "d225dc82234a12ebc63d68ad4eb4d653b96fe8d823157c0f0fcd693e22150af7"
   },
-  "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4"
+  "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4",
+  "lvs_reference": {
+    "repository": "https://github.com/davidlandry93/sidown",
+    "revision": "5396f9f5ecb673394b532c80a3e4922d842d1c78",
+    "paths": [
+      "src/sidown/evaluation/modelmetrics.py",
+      "src/sidown/dataprep/eupp/dataset.py",
+      "src/sidown/dataprep/base.py"
+    ],
+    "scope": "Independent implementation of score arithmetic; train-only climatology and within-group neighborhoods adapted to Chen/Lerch benchmark; no upstream source redistribution"
+  }
 }
