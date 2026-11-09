@@ -351,6 +351,51 @@ is a separate next step after freezing this validation choice; the 2016 test
 year has already been inspected repeatedly and is not an untouched holdout.
 Riesz has additional metric/temperature tuning effort relative to energy.
 
+TEST THE FROZEN VALIDATION-LVS TEMPERATURE CHOICE
+----------------------------------------------
+After tune_temperature_lvs.py finishes:
+
+    nohup python -u evaluate_temperature_lvs.py --device cpu > weather_lvs_selected_test.log 2>&1 &
+    tail -f weather_lvs_selected_test.log
+
+Defaults read runs/temperature_lvs_validation_sweep/selection.json and verify
+its complete validation ranking and the frozen LR/temperature provenance chain.
+The test runner does not choose a different candidate using test performance.
+The selected setting is compared with the cached energy baseline, previous
+softmax setting, exact-uniform Riesz, and raw forecasts. No baseline is retrained.
+The default reference paths are runs/temperature_learning_rate_selected_test
+and runs/temperature_uniform_comparison. Override --reference-runs and
+--uniform-runs if needed; --skip-uniform omits that reference.
+
+The selected model uses ten seeds x five scenarios per model = fifty scenarios
+for every case, over groups 0-9. With a three-group/three-seed sweep and the
+scale-64 winner, nine selected fits are reused and 91 additional fits are
+trained. The LR (currently .0005), model, particle count, early stopping,
+checkpoint selection, test noise seeds and sample count stay unchanged. If the
+validation winner is identical to the previous setting, all completed reference
+fits can be reused instead. Missing prepared data or reference forecasts are
+reported before any new fits begin.
+
+Results:
+    runs/temperature_lvs_selected_test/summary.json
+    runs/temperature_lvs_selected_test/groupXX/comparison.json
+    runs/temperature_lvs_selected_test/groupXX/per_case_lvs.npz
+    runs/temperature_lvs_selected_test/groupXX/riesz_softmax/evaluation/predictions.npz
+
+The final table includes ES, full-group VS, station-mean CRPS, anomaly LVS and
+physical-temperature LVS for all methods. Reference saved forecasts are checked
+against their data hash, targets, dates, scores, and completed checkpoint/config
+records. Reference results remain read-only. Each output retains prediction and
+checkpoint identities, frozen selections, local neighborhood indices and
+training-only climatology. Partial summaries are saved after each group. Re-run
+the identical command to resume; a different choice/group list/reference path
+requires a new --workdir. Existing outputs are never silently replaced with
+forecasts from different checkpoints.
+
+This remains exploratory reuse of the already inspected 2016 test year. A
+validation-LVS winner need not improve test LVS or ES. Groups overlap and are
+not independent statistical replicates; the runner makes no significance claim.
+
 EXACT UNIFORM-WEIGHT ABLATION
 ----------------------------
 After the tuned-LR ten-group comparison has finished:

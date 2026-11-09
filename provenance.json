@@ -47,7 +47,8 @@
     "compare_particles.py": "4bcd0b05f9b1b0d5e127492c637291e0edd22854bd1384e0ffcf14ff1c073329",
     "evaluate_lvs.py": "0582c3b6ae6848e546edfd430d5e6e2ebc01433db4971ec97a1e4053b49a1bff",
     "weather/local_variogram.py": "d225dc82234a12ebc63d68ad4eb4d653b96fe8d823157c0f0fcd693e22150af7",
-    "tune_temperature_lvs.py": "518814cbf0ae8c9353a97eef7593a1459a3f5068c1ff9b6071f0d20ebbe46a9e"
+    "tune_temperature_lvs.py": "518814cbf0ae8c9353a97eef7593a1459a3f5068c1ff9b6071f0d20ebbe46a9e",
+    "evaluate_temperature_lvs.py": "23c73016cbd31902e101c68c90002fc561539e3d4b44175c9b82fd43f7053937"
   },
   "prepared_data_sha256": "30dbf5676f8f236eb26959e05fa9dd2daa3c9732ce0a08fb8404bf51d0703db4",
   "lvs_reference": {

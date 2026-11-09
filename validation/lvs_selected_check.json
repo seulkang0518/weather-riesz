@@ -1,0 +1,13 @@
+{
+  "development_only": true,
+  "changed_temperature_integration": "runs/lvs_selected_new_fit_check/summary.json",
+  "new_selected_fits": 9,
+  "frozen_sweep_fits_reused": 1,
+  "evaluation_models": 10,
+  "evaluation_scenarios": 50,
+  "resume_preserves_checkpoint_prediction_metric_and_per_case_lvs_mtimes": true,
+  "unchanged_winner_integration": "runs/lvs_selected_check/summary.json",
+  "unchanged_winner_max_score_difference": 1.0561463259506354e-08,
+  "unit_tests": 25,
+  "note": "Development group0 fixtures use LR .001 and scales1/4, not the production scale64 LR .0005 choice."
+}
