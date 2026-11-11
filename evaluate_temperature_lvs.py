@@ -8,6 +8,7 @@ import torch
 import yaml
 
 from compare_uniform import checked_reference
+from compare_particles import particle_config
 from evaluate_learning_rate import check_evaluation, validate_lr_selection
 from evaluate_lvs import load_forecast
 from evaluate_selected import validate_selection
@@ -20,14 +21,14 @@ from weather.local_variogram import (local_variogram, nearest_other_stations,
 from weather.metrics import scores
 
 
-def validate_lvs_selection(selection, lr_selection):
+def validate_lvs_selection(selection, lr_selection, *, train_particles=50):
     """Require the actual complete validation winner, with the inherited fixed LR."""
     if (selection.get('kind') != 'temperature_lvs'
             or selection.get('test_evaluated_by_this_sweep') is not False):
         raise ValueError('Require a frozen validation-only LVS temperature selection')
     exp = selection['experiment']
-    if exp.get('train_particles',50)!=50:
-        raise ValueError('This evaluator is for 50-particle sweeps; lower-count choices require particle-matched references')
+    if exp.get('train_particles',50) != train_particles:
+        raise ValueError('Selection requires particle-matched references: set --train-particles to the frozen sweep count')
     base, configs = validate_lr_selection(lr_selection)
     if exp['base_config'] != base or exp['fixed_learning_rate'] != configs['riesz_softmax']['learning_rate']:
         raise ValueError('LVS sweep changed the inherited base configuration or fixed LR')
@@ -47,8 +48,49 @@ def validate_lvs_selection(selection, lr_selection):
     if (selection['ranking'] != ranking or selection['selected_multiplier'] != winner
             or selection['selected_temperatures'] != chosen):
         raise ValueError('Frozen choice does not match the complete validation LVS ranking')
+    if train_particles != 50:
+        configs = {method: particle_config(cfg, train_particles) for method, cfg in configs.items()}
     cfg = dict(configs['riesz_softmax'], temperatures=chosen)
     return base, configs, cfg
+
+
+def particle_forecast(root, reference, group, particles, data_hash, lr_hash, method,
+                      *, output_root=None, seen=None):
+    """Verify saved matched-count fits/forecasts, following read-only pilot reuse."""
+    root = Path(root).resolve()
+    seen = set() if seen is None else seen
+    if root in seen:
+        raise ValueError('Cyclic particle-run reuse provenance')
+    seen.add(root)
+    if output_root is not None:
+        output_root = Path(output_root).resolve()
+        if root == output_root or root.is_relative_to(output_root) or output_root.is_relative_to(root):
+            raise ValueError('Particle source and output must be separate nonnested directories')
+    spec = read_json(root/'experiment.json')
+    if (spec['lr_selection_sha256'] != lr_hash or group not in spec['groups']
+            or particles not in spec['particles'] or method not in spec.get('methods', [])
+            or spec['reference_configs'].get(method) != reference
+            or spec['validation_samples'] != 50 or spec['test_samples'] != 50):
+        raise ValueError('Particle forecast uses another recipe/group/count/protocol')
+    cell = root/f'group{group:02d}/{method}/particles{particles}'
+    pf = cell/'checkpoint_provenance.json'
+    if not pf.exists():
+        reused = spec.get('reuse_run')
+        if reused is None:
+            raise FileNotFoundError(f'Missing completed particle reference: {pf}')
+        previous = Path(reused['directory']).resolve()
+        if digest(previous/'experiment.json') != reused['experiment_sha256']:
+            raise ValueError('Particle pilot experiment changed')
+        return particle_forecast(previous, reference, group, particles, data_hash, lr_hash, method,
+                                 output_root=output_root, seen=seen)
+    evaluation = cell/'evaluation'
+    _, records = checked_reference(evaluation/'metrics.json',
+        dict(particle_config(reference, particles), group=group), data_hash, method)
+    if read_json(pf)['fits'] != records:
+        raise ValueError('Particle reference checkpoint provenance changed')
+    if not (evaluation/'predictions.npz').is_file():
+        raise FileNotFoundError(f'Missing saved particle forecasts: {evaluation}')
+    return evaluation, records
 
 
 def score_group(data, meta, paths, data_hash):
@@ -83,11 +125,18 @@ def main():
     p.add_argument('--reference-runs', default='runs/temperature_learning_rate_selected_test')
     p.add_argument('--uniform-runs', default='runs/temperature_uniform_comparison')
     p.add_argument('--skip-uniform', action='store_true')
+    p.add_argument('--train-particles', type=int, default=50,
+                   help='Must match the frozen LVS sweep; validation/test ensembles remain 50')
+    p.add_argument('--particle-runs', help='Completed matched-count comparison (required below 50)')
     p.add_argument('--groups', nargs='+', type=int, default=list(range(10)))
     p.add_argument('--data-dir', default='data')
     p.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     p.add_argument('--workdir', default='runs/temperature_lvs_selected_test')
     a = p.parse_args()
+    if a.train_particles < 2:
+        p.error('Require at least two training particles')
+    if (a.train_particles != 50) != bool(a.particle_runs):
+        p.error('Lower-count evaluation requires --particle-runs; omit it for the original 50-particle setup')
     def absolute(path):
         path = Path(path)
         return (path if path.is_absolute() else ROOT/path).resolve()
@@ -100,7 +149,8 @@ def main():
     if digest(lr_path) != selection['experiment']['lr_selection_sha256']:
         raise ValueError('Underlying LR selection changed')
     lr_selection = read_json(lr_path)
-    base, configs, selected_cfg = validate_lvs_selection(selection, lr_selection)
+    base, configs, selected_cfg = validate_lvs_selection(selection, lr_selection,
+                                                       train_particles=a.train_particles)
     temp_path = selection_path.parent/'frozen_temperature_selection.json'
     if digest(temp_path) != lr_selection['experiment']['temperature_selection_sha256']:
         raise ValueError('Underlying ES-temperature selection changed')
@@ -108,24 +158,45 @@ def main():
     if temp_base != base or chosen != configs['riesz_softmax']['temperatures']:
         raise ValueError('Inherited temperature provenance mismatch')
     if (base['stations'] != 10 or len(base['seeds']) != 10 or len(set(base['seeds'])) != 10
-            or base['eval_samples_per_model'] != 5 or selected_cfg['train_samples'] != 50
+            or base['eval_samples_per_model'] != 5 or selected_cfg['train_samples'] != a.train_particles
             or validation_sample_count(selected_cfg) != 50):
-        raise ValueError('Require ten stations, ten models and fifty training/evaluation scenarios')
+        raise ValueError('Require ten stations, ten models, matched training count and fifty validation/evaluation scenarios')
     root = absolute(a.workdir)
+    if root == selection_path.parent or root.is_relative_to(selection_path.parent) or selection_path.parent.is_relative_to(root):
+        raise ValueError('Sweep and evaluation output must be separate nonnested directories')
     spec = {'selection_sha256': digest(selection_path), 'lr_selection_sha256': digest(lr_path),
             'selected_config': selected_cfg, 'groups': a.groups,
             'reference_runs': str(absolute(a.reference_runs)),
             'uniform_runs': None if a.skip_uniform else str(absolute(a.uniform_runs)),
             'data_dir': str(absolute(a.data_dir)),
             'selection_policy': 'frozen validation LVS winner; no test reselection'}
+    particle_root = None
+    if a.particle_runs:
+        particle_root = absolute(a.particle_runs)
+        frozen = selection['experiment']['particle_reference']
+        if (particle_root != Path(frozen['directory']).resolve()
+                or digest(particle_root/'experiment.json') != frozen['experiment_sha256']
+                or digest(selection_path.parent/'frozen_particle_experiment.json') != frozen['experiment_sha256']):
+            raise ValueError('Particle source differs from the frozen validation sweep')
+        spec.update(train_particles=a.train_particles, particle_reference=frozen,
+                    reference_runs=None, uniform_runs=None)
     if (root/'experiment.json').exists() and read_json(root/'experiment.json') != spec:
         raise ValueError('Workdir belongs to a different frozen experiment')
     # Check baseline input availability before fitting any additional models.
+    particle_priors = {}
     for group in a.groups:
         paths = [absolute(a.data_dir)/f'temperature10_group{group}.npz',
                  absolute(a.data_dir)/f'temperature10_group{group}.json']
-        refs = [absolute(a.reference_runs)/f'group{group:02d}/{m}/evaluation' for m in ('energy','riesz_softmax')]
-        if not a.skip_uniform: refs.append(absolute(a.uniform_runs)/f'group{group:02d}/evaluation')
+        if particle_root:
+            methods = ('energy', 'riesz_softmax') + (() if a.skip_uniform else ('riesz_uniform',))
+            for method in methods:
+                reference = lr_selection['methods']['energy' if method == 'energy' else 'riesz_softmax']['config']
+                particle_priors[group, method] = particle_forecast(particle_root, reference, group,
+                    a.train_particles, digest(paths[0]), digest(lr_path), method, output_root=root)
+            refs = [particle_priors[group, method][0] for method in methods]
+        else:
+            refs = [absolute(a.reference_runs)/f'group{group:02d}/{m}/evaluation' for m in ('energy','riesz_softmax')]
+            if not a.skip_uniform: refs.append(absolute(a.uniform_runs)/f'group{group:02d}/evaluation')
         paths += [d/f for d in refs for f in ('metrics.json', 'predictions.npz')]
         for path in paths:
             if not path.is_file(): raise FileNotFoundError(f'Missing prepared data/reference forecast: {path}')
@@ -136,10 +207,17 @@ def main():
         saved = root/name
         if saved.exists() and saved.read_bytes() != source.read_bytes(): raise ValueError('Frozen snapshot changed')
         saved.write_bytes(source.read_bytes())
+    if particle_root:
+        saved = root/'frozen_particle_experiment.json'
+        source = selection_path.parent/'frozen_particle_experiment.json'
+        if saved.exists() and saved.read_bytes() != source.read_bytes():
+            raise ValueError('Frozen particle snapshot changed')
+        saved.write_bytes(source.read_bytes())
     selected_trials = {(r['group'], r['seed']): r for r in selection['trials']
                        if r['multiplier']==selection['selected_multiplier']}
     rows = []
     print(f'Frozen Riesz temperatures: {selected_cfg["temperatures"]}; LR {selected_cfg["learning_rate"]:g}.', flush=True)
+    print(f'Training particles: {a.train_particles}; validation 50; test 10 models x 5 scenarios.', flush=True)
     for group in a.groups:
         data_path = absolute(a.data_dir)/f'temperature10_group{group}.npz'
         data_hash = digest(data_path); meta = read_json(data_path.with_suffix('.json'))
@@ -148,16 +226,24 @@ def main():
             raise ValueError('Prepared data differs from frozen sweep')
         cfg = dict(selected_cfg, group=group)
         ref_root = absolute(a.reference_runs)/f'group{group:02d}'
-        paths = {'energy': (ref_root/'energy/evaluation','energy'),
-                 'riesz_before': (ref_root/'riesz_softmax/evaluation','riesz_softmax')}
+        paths = {}
         reference_provenance = {}
         for label, method in (('energy','energy'), ('riesz_before','riesz_softmax')):
-            _, reference_provenance[label] = checked_reference(paths[label][0]/'metrics.json',
-                                                              dict(configs[method], group=group), data_hash, method)
+            if particle_root:
+                directory, reference_provenance[label] = particle_priors[group, method]
+            else:
+                directory = ref_root/f'{method}/evaluation'
+                _, reference_provenance[label] = checked_reference(directory/'metrics.json',
+                    dict(configs[method], group=group), data_hash, method)
+            paths[label] = (directory, method)
         if not a.skip_uniform:
-            paths['riesz_uniform'] = (absolute(a.uniform_runs)/f'group{group:02d}/evaluation','riesz_uniform')
-            _, reference_provenance['riesz_uniform'] = checked_reference(paths['riesz_uniform'][0]/'metrics.json',
-                dict(configs['riesz_softmax'], group=group), data_hash, 'riesz_uniform')
+            if particle_root:
+                directory, reference_provenance['riesz_uniform'] = particle_priors[group, 'riesz_uniform']
+            else:
+                directory = absolute(a.uniform_runs)/f'group{group:02d}/evaluation'
+                _, reference_provenance['riesz_uniform'] = checked_reference(directory/'metrics.json',
+                    dict(configs['riesz_softmax'], group=group), data_hash, 'riesz_uniform')
+            paths['riesz_uniform'] = (directory, 'riesz_uniform')
         group_root = root/f'group{group:02d}'
         model_root = group_root/'riesz_softmax'; model_root.mkdir(parents=True, exist_ok=True)
         config_path = model_root/'config.yaml'; config_path.write_text(yaml.safe_dump(cfg, sort_keys=False))
@@ -213,6 +299,7 @@ def main():
         methods = list(result)
         means = {m: {k: float(np.mean([r['metrics'][m][k] for r in rows])) for k in result[m]} for m in methods}
         summary = {'complete': len(rows)==len(a.groups), 'requested_groups': a.groups, 'groups': rows,
+                   'training_particles': a.train_particles, 'validation_scenarios_per_model': 50,
                    'group_mean_scores': means, 'selected_temperatures': selected_cfg['temperatures'],
                    'previous_temperatures': configs['riesz_softmax']['temperatures'],
                    'learning_rates': {m: c['learning_rate'] for m,c in configs.items()},

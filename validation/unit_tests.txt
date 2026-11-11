@@ -1,4 +1,4 @@
-.................................                                        [100%]
+...................................                                      [100%]
 =============================== warnings summary ===============================
 ../../../../.pyenv/versions/3.11.9/lib/python3.11/site-packages/anyio/pytest_plugin.py:14
   /Users/sophiakang/.pyenv/versions/3.11.9/lib/python3.11/site-packages/anyio/pytest_plugin.py:14: PytestRemovedIn10Warning: _pytest.python.CallSpec2 has been renamed to CallSpec.
@@ -8,4 +8,4 @@
     from _pytest.python import CallSpec2
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-33 passed, 1 warning in 0.84s
+35 passed, 1 warning in 1.09s

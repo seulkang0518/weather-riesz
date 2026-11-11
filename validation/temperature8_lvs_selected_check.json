@@ -1,0 +1,19 @@
+{
+  "development_only": true,
+  "data": "synthetic, one-epoch integration; no scientific forecast result",
+  "training_particles": 8,
+  "validation_samples": 50,
+  "test_scenarios": 50,
+  "reference_methods": [
+    "energy",
+    "riesz_softmax",
+    "riesz_uniform"
+  ],
+  "read_only_full_to_pilot_reuse": true,
+  "selected_sweep_fit_reused": 1,
+  "missing_selected_fits": 9,
+  "source_mtimes_unchanged": true,
+  "resume_no_refit_or_resampling": true,
+  "all_five_metrics_scored": true,
+  "unit_tests": 35
+}

@@ -394,11 +394,47 @@ reference. All baseline fits are checked before any new training starts.
 
 The selected YAML explicitly retains train_samples=8 and validation_samples=50.
 Re-run the same command to resume. Changing grid/count/source requires a new
-workdir. No test evaluation is run by this sweep. The 50-particle test runner
-rejects this lower-count selection to prevent an accidental unmatched comparison;
-particle-matched test evaluation is a separate step after the choice is frozen.
+workdir. No test evaluation is run by this sweep. The test runner's 50-particle
+defaults reject this lower-count selection; opt in to matched evaluation below.
 As before, this is exploratory tuning on a repeatedly used validation year,
 and 2016 is already inspected. Sharper weights need not improve either metric.
+
+TEST THE FROZEN EIGHT-PARTICLE TEMPERATURE CHOICE
+----------------------------------------------
+After the eight-particle sweep has completed and its choice is frozen:
+
+    nohup python -u evaluate_temperature_lvs.py --device cpu \
+      --selection runs/temperature8_lvs_validation_sweep/selection.json \
+      --train-particles 8 \
+      --particle-runs runs/temperature_particle_lvs_full \
+      --workdir runs/temperature8_lvs_selected_test \
+      > weather_temperature8_lvs_selected_test.log 2>&1 &
+    tail -f weather_temperature8_lvs_selected_test.log
+
+This verifies and reads the saved eight-particle energy, previous Riesz-softmax,
+and exact-uniform forecasts for all ten station groups. It follows the full
+particle run's recorded link back to the pilot for groups 0-2, checks checkpoint
+hashes/configs/seeds/data and refuses to silently use 50-particle fits. Source
+and output directories must be separate and nonnested; source runs stay read-only.
+
+Only the selected-temperature Riesz models that are missing are trained. With
+three groups x three selected validation seeds, nine selected fits are reused
+and 91 fits are added to complete ten groups x ten models. If the winner is the
+unchanged reference setting, the remaining reference fits are reused instead.
+Training stays at eight particles, LR .0005, and fixed-noise validation ES-based
+checkpoint selection with 50 samples. Final forecasts remain ten models x five
+scenarios = 50. No temperatures or other settings are selected using test scores.
+
+The comparison prints ES, VS, CRPS, anomaly LVS and physical LVS for energy,
+previous Riesz, selected Riesz, uniform Riesz and the raw ensemble. Results:
+
+    runs/temperature8_lvs_selected_test/summary.json
+
+The summary records per-group scores, paired differences, checkpoint identities
+and forecast hashes. Re-run the identical command to resume without refitting
+finished models or resampling saved forecasts. This is exploratory evaluation on
+the already inspected 2016 year, with extra tuning effort for Riesz. Overlapping
+station groups are not independent replicates; no significance claim is made.
 
 TEST THE FROZEN VALIDATION-LVS TEMPERATURE CHOICE
 ----------------------------------------------
