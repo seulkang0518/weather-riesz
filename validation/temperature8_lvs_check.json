@@ -1,0 +1,16 @@
+{
+  "development_only": true,
+  "selection": "runs/temperature8_lvs_check/selection.json",
+  "training_particles": 8,
+  "quality_validation_samples": 50,
+  "repulsion_diagnostic_particles": 8,
+  "maximum_effective_neighbors": 7,
+  "new_lower_temperature_fits": 1,
+  "reused_reference_fits": 1,
+  "nested_pilot_reference_resolved": true,
+  "source_checkpoints_and_resume_cache_mtimes_unchanged": true,
+  "fifty_particle_backward_compatibility_checked": true,
+  "test_evaluated_by_sweep": false,
+  "unit_tests": 33,
+  "note": "Development group0, LR .001, multipliers .25/4; not the production LR .0005 grid or forecast results."
+}

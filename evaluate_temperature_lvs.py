@@ -26,6 +26,8 @@ def validate_lvs_selection(selection, lr_selection):
             or selection.get('test_evaluated_by_this_sweep') is not False):
         raise ValueError('Require a frozen validation-only LVS temperature selection')
     exp = selection['experiment']
+    if exp.get('train_particles',50)!=50:
+        raise ValueError('This evaluator is for 50-particle sweeps; lower-count choices require particle-matched references')
     base, configs = validate_lr_selection(lr_selection)
     if exp['base_config'] != base or exp['fixed_learning_rate'] != configs['riesz_softmax']['learning_rate']:
         raise ValueError('LVS sweep changed the inherited base configuration or fixed LR')

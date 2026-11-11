@@ -47,3 +47,6 @@ def test_frozen_lvs_winner_retains_lr_and_rejects_reselection_or_tampering():
     with pytest.raises(ValueError): validate_lvs_selection(bad, lr)
     bad = deepcopy(selection); bad['trials'][0]['temperatures'] = [.2,.05,.02]
     with pytest.raises(ValueError): validate_lvs_selection(bad, lr)
+    bad = deepcopy(selection); bad['experiment']['train_particles'] = 8
+    with pytest.raises(ValueError,match='particle-matched'):
+        validate_lvs_selection(bad, lr)

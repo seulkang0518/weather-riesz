@@ -351,6 +351,55 @@ is a separate next step after freezing this validation choice; the 2016 test
 year has already been inspected repeatedly and is not an untouched holdout.
 Riesz has additional metric/temperature tuning effort relative to energy.
 
+EIGHT-PARTICLE TEMPERATURE SWEEP FOR SELECTIVE REPULSION
+----------------------------------------------------
+Question: Can more selective repulsion improve local spatial dependence when
+training with eight particles? This is separate from the completed 50-particle
+temperature sweep, whose selected setting did not improve test results.
+
+After the full particle-count comparison has finished:
+
+    nohup python -u tune_temperature_lvs.py --device cpu \
+      --train-particles 8 \
+      --particle-runs runs/temperature_particle_lvs_full \
+      --multipliers 0.25 1 4 16 512 \
+      --workdir runs/temperature8_lvs_validation_sweep \
+      > weather_temperature8_lvs.log 2>&1 &
+    tail -f weather_temperature8_lvs.log
+
+Defaults use groups 0-2 and seeds 42-44: 45 fits, of which nine scale-512
+eight-particle fits are reused and 36 lower-temperature fits are new. The five
+temperature lists are [.05,.0125,.005], [.2,.05,.02], [.8,.2,.08], [3.2,.8,.32],
+and [102.4,25.6,10.24]. LR remains the inherited Riesz .0005 choice. Architecture,
+batch size, initialization/training seeds, early stopping and ES-based checkpoint
+selection stay fixed. Only temperatures change BETWEEN these eight-particle
+candidates. The original 50-particle sweep's defaults remain backward compatible.
+
+Quality evaluation uses 50 predictions per model on 2015 validation cases and
+reports anomaly LVS, empirical ES and CRPS. Candidate ranking uses validation
+anomaly LVS. Weight diagnostics separately draw eight predictions per case with
+a fixed independent noise stream, preserving the 50-prediction quality stream.
+ESS is therefore bounded by seven other particles, not 49. These are training-
+cardinality diagnostics on validation conditions, not recorded training batches.
+
+The reference resolver reads experiment metadata and checkpoint provenance only;
+it never loads particle-run test scores/predictions to select a temperature. It
+follows the full run's recorded reuse pointer back to the original pilot for
+groups 0-2, checks config/data/seed/checkpoint hashes, and keeps source runs
+read-only. It refuses to substitute a 50-particle checkpoint for an eight-particle
+reference. All baseline fits are checked before any new training starts.
+
+    runs/temperature8_lvs_validation_sweep/selection.json
+    runs/temperature8_lvs_validation_sweep/selected_config.yaml
+
+The selected YAML explicitly retains train_samples=8 and validation_samples=50.
+Re-run the same command to resume. Changing grid/count/source requires a new
+workdir. No test evaluation is run by this sweep. The 50-particle test runner
+rejects this lower-count selection to prevent an accidental unmatched comparison;
+particle-matched test evaluation is a separate step after the choice is frozen.
+As before, this is exploratory tuning on a repeatedly used validation year,
+and 2016 is already inspected. Sharper weights need not improve either metric.
+
 TEST THE FROZEN VALIDATION-LVS TEMPERATURE CHOICE
 ----------------------------------------------
 After tune_temperature_lvs.py finishes:

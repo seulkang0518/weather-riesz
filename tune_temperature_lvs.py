@@ -23,6 +23,47 @@ from weather.local_variogram import (local_variogram, nearest_other_stations,
 from weather.metrics import scores
 from weather.model import TemperatureCGM
 from weather.objectives import training_energy_score
+from compare_particles import particle_config
+
+
+def trial_config(reference,base_temperatures,multiplier,group,particles=50):
+    return dict(particle_config(reference,particles),group=group,
+                temperatures=temperatures(base_temperatures,multiplier))
+
+
+def particle_reference(root,inherited,group,seed,particles,data_hash,lr_hash,seen=None):
+    """Read only config/checkpoint provenance; never read test scores or forecasts.
+
+    A full particle run can point back to its read-only pilot for reused groups.
+    """
+    root=Path(root).resolve(); seen=set() if seen is None else seen
+    if root in seen: raise ValueError('Cyclic particle-run reuse provenance')
+    seen.add(root)
+    spec=read_json(root/'experiment.json')
+    if (spec['lr_selection_sha256']!=lr_hash or group not in spec['groups']
+            or particles not in spec['particles'] or 'riesz_softmax' not in spec.get('methods',[])
+            or spec['reference_configs'].get('riesz_softmax')!=inherited
+            or spec['validation_samples']!=50 or spec['test_samples']!=50):
+        raise ValueError('Particle reference uses another recipe/group/count/protocol')
+    provenance=root/f'group{group:02d}/riesz_softmax/particles{particles}/checkpoint_provenance.json'
+    if not provenance.exists():
+        reused=spec.get('reuse_run')
+        if reused is None: raise FileNotFoundError(f'Missing completed particle reference: {provenance}')
+        previous=Path(reused['directory']).resolve()
+        if digest(previous/'experiment.json')!=reused['experiment_sha256']:
+            raise ValueError('Particle pilot experiment changed')
+        return particle_reference(previous,inherited,group,seed,particles,data_hash,lr_hash,seen)
+    saved=read_json(provenance)
+    rows=[r for r in saved['fits'] if r['seed']==seed]
+    if len(rows)!=1: raise ValueError('Particle reference seed missing or duplicated')
+    row=rows[0]; checkpoint=Path(row['checkpoint'])
+    if not checkpoint.is_absolute(): checkpoint=ROOT/checkpoint
+    work=checkpoint.resolve().parent
+    cfg=dict(particle_config(inherited,particles),group=group)
+    record=fit_record(work,cfg,seed,data_hash)
+    if record is None or dict(record,seed=seed)!=row:
+        raise ValueError('Particle reference checkpoint is incomplete or changed')
+    return work,record
 
 
 @torch.no_grad()
@@ -78,6 +119,7 @@ def score_validation(checkpoint, data, cfg, device):
     model.load_state_dict(state['model']); model.eval()
     inputs = load_split(data, 'val', device)
     generator = torch.Generator(device=device).manual_seed(cfg['validation_seed'])
+    diagnostic_generator = torch.Generator(device=device).manual_seed(cfg['validation_seed']+701)
     mean, std, _ = seasonal_climatology(data['train_target'], data['train_dates'], data['val_dates'])
     neighbors = nearest_other_stations(*recover_coordinates(data, state['manifest']['data_metadata']))
     predictions, weight_sums, training_es = [], None, 0.
@@ -88,7 +130,11 @@ def score_validation(checkpoint, data, cfg, device):
             target = inputs['target'][idx]
             predictions.append(pred.cpu().numpy())
             training_es += training_energy_score(pred, target).sum().item()
-            stats = repulsion_statistics(pred, target, cfg['temperatures'])
+            # Keep the 50-sample quality stream unchanged. Measure weights using
+            # the training cardinality, with a separate reproducible noise stream.
+            diagnostic_pred = (pred if cfg['train_samples']==samples else
+                               predict(model,inputs,idx,cfg['train_samples'],diagnostic_generator))
+            stats = repulsion_statistics(diagnostic_pred, target, cfg['temperatures'])
             if weight_sums is None:
                 weight_sums = [dict(s, effective_neighbors=0., fraction_of_uniform_ess=0., maximum_neighbor_weight=0.) for s in stats]
             for accumulated, stat in zip(weight_sums, stats):
@@ -103,10 +149,13 @@ def score_validation(checkpoint, data, cfg, device):
     for stat in weight_sums:
         for key in ('effective_neighbors', 'fraction_of_uniform_ess', 'maximum_neighbor_weight'):
             stat[key] /= len(target)
-    return {'validation_lvs_anomaly': float(lvs.mean()),
+    result = {'validation_lvs_anomaly': float(lvs.mean()),
             'validation_energy_empirical': empirical['energy_score'].mean().item(),
             'validation_crps': empirical['mean_crps'].mean().item(),
             'repulsion_weights': weight_sums, 'validation_cases': len(target), 'validation_samples': samples}
+    if cfg['train_samples']!=samples:
+        result.update(repulsion_particles=cfg['train_samples'],repulsion_available_neighbors=cfg['train_samples']-1)
+    return result
 
 
 def main():
@@ -118,6 +167,8 @@ def main():
     p.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     p.add_argument('--data-dir', default='data')
     p.add_argument('--workdir', default='runs/temperature_lvs_validation_sweep')
+    p.add_argument('--train-particles',type=int,default=50)
+    p.add_argument('--particle-runs',help='Completed particle-count run to reuse the lower-count reference fits')
     a = p.parse_args()
     def absolute(path):
         path = Path(path)
@@ -126,6 +177,11 @@ def main():
     selection = read_json(selection_path)
     base, configs = validate_lr_selection(selection)
     inherited = configs['riesz_softmax']
+    particle_config(inherited,a.train_particles)
+    if a.train_particles!=50 and not a.particle_runs:
+        p.error('Lower-count tuning requires --particle-runs to verify/reuse the matching reference')
+    if a.train_particles==50 and a.particle_runs:
+        p.error('--particle-runs is for lower-count tuning; the 50-particle reference comes from the LR sweep')
     temperature_path = selection_path.parent/'frozen_temperature_selection.json'
     if digest(temperature_path) != selection['experiment']['temperature_selection_sha256']:
         raise ValueError('Underlying frozen temperature selection changed')
@@ -150,6 +206,20 @@ def main():
             'candidate_selection': 'equal-group mean of per-seed 2015 anomaly LVS, 50 samples',
             'lvs': {'neighbors': 5, 'exclude_center': True, 'power': .5, 'window': 21},
             'test_use': 'none; 2016 was previously inspected in earlier experiments'}
+    particle_root=None; particle_priors={}
+    if a.train_particles!=50:
+        particle_root=absolute(a.particle_runs)
+        if root==particle_root or root.is_relative_to(particle_root) or particle_root.is_relative_to(root):
+            raise ValueError('Particle source and tuning workdir must be separate nonnested directories')
+        spec.update(train_particles=a.train_particles,repulsion_diagnostic_particles=a.train_particles,
+                    particle_reference={'directory':str(particle_root),
+                                        'experiment_sha256':digest(particle_root/'experiment.json')})
+        # Verify all matching reference fits before starting any new training.
+        for group in a.groups:
+            data_path=absolute(a.data_dir)/f'temperature10_group{group}.npz'
+            for seed in a.seeds:
+                particle_priors[group,seed]=particle_reference(particle_root,inherited,group,seed,a.train_particles,
+                                                              digest(data_path),digest(selection_path))
     if (root/'experiment.json').exists() and read_json(root/'experiment.json') != spec:
         raise ValueError('Workdir belongs to another frozen setup; choose a new workdir')
     root.mkdir(parents=True, exist_ok=True)
@@ -159,8 +229,15 @@ def main():
         if saved.exists() and saved.read_bytes() != source.read_bytes():
             raise ValueError('Frozen selection snapshot differs')
         saved.write_bytes(source.read_bytes())
+    if particle_root:
+        saved=root/'frozen_particle_experiment.json'
+        if saved.exists() and saved.read_bytes()!=(particle_root/'experiment.json').read_bytes():
+            raise ValueError('Frozen particle experiment snapshot differs')
+        saved.write_bytes((particle_root/'experiment.json').read_bytes())
     prior = {(r['group'], r['seed']): r for r in selection['trials']
              if r['method']=='riesz_softmax' and r['learning_rate']==inherited['learning_rate']}
+    print(f'Training particles: {a.train_particles}; quality validation samples: 50; '
+          f'repulsion diagnostic particles: {a.train_particles} (max ESS {a.train_particles-1}).',flush=True)
     trials, hashes = [], {}
     for group in a.groups:
         path = absolute(a.data_dir)/f'temperature10_group{group}.npz'
@@ -172,15 +249,17 @@ def main():
             if meta['station_group'] != group or len(meta['stations']) != 10:
                 raise ValueError('Prepared station group mismatch')
             for multiplier in a.multipliers:
-                cfg = dict(inherited, group=group, temperatures=temperatures(base['temperatures'], multiplier))
-                if cfg['train_samples'] != 50 or validation_sample_count(cfg) != 50:
-                    raise ValueError('This temperature-only comparison requires 50 train/validation particles')
+                cfg = trial_config(inherited,base['temperatures'],multiplier,group,a.train_particles)
+                if validation_sample_count(cfg) != 50:
+                    raise ValueError('Temperature comparison requires 50 validation samples')
                 label = f'scale_{multiplier:.17g}'.replace('.', 'p')
                 config_path = root/f'group{group:02d}_{label}.yaml'
                 config_path.write_text(yaml.safe_dump(cfg, sort_keys=False))
                 for seed in a.seeds:
                     work = root/label/f'group{group:02d}'/f'seed{seed}'
-                    old = prior.get((group, seed)) if cfg['temperatures']==inherited['temperatures'] else None
+                    old = (prior.get((group, seed)) if a.train_particles==50 else None) if cfg['temperatures']==inherited['temperatures'] else None
+                    if a.train_particles!=50 and cfg['temperatures']==inherited['temperatures']:
+                        work,old=particle_priors[group,seed]
                     if old:
                         work = absolute(old['checkpoint']).parent
                         if digest(work/'best.pt') != old['checkpoint_sha256']:
@@ -212,7 +291,7 @@ def main():
                                        temperatures=cfg['temperatures'], reused_frozen_fit=bool(old)))
                     print(f'Group {group}, scale {multiplier:g}, seed {seed}: val LVS {scored["validation_lvs_anomaly"]:.6f}; '
                           f'ES {scored["validation_energy_empirical"]:.6f}; '
-                          f'ESS {[round(r["effective_neighbors"], 2) for r in scored["repulsion_weights"]]} / 49', flush=True)
+                          f'ESS {[round(r["effective_neighbors"], 2) for r in scored["repulsion_weights"]]} / {a.train_particles-1}', flush=True)
                     (root/'progress.json').write_text(json.dumps({'experiment': spec, 'trials': trials}, indent=2))
     ranking = rank_candidates(trials, a.groups, a.seeds, a.multipliers)
     winner = ranking[0]['multiplier']
@@ -224,8 +303,9 @@ def main():
     frozen = root/'selection.json'
     if frozen.exists() and read_json(frozen) != result: raise ValueError('Frozen selection would change')
     frozen.write_text(json.dumps(result, indent=2))
-    (root/'selected_config.yaml').write_text(yaml.safe_dump(dict(inherited, temperatures=result['selected_temperatures']), sort_keys=False))
-    print('\nScale      Val anomaly LVS    Val ES        Effective neighbors per temperature / 49')
+    (root/'selected_config.yaml').write_text(yaml.safe_dump(
+        dict(particle_config(inherited,a.train_particles),temperatures=result['selected_temperatures']), sort_keys=False))
+    print(f'\nScale      Val anomaly LVS    Val ES        Effective neighbors per temperature / {a.train_particles-1}')
     for row in ranking:
         print(f'{row["multiplier"]:<10g} {row["mean_validation_lvs_anomaly"]:.6f}           '
               f'{row["mean_validation_energy_empirical"]:.6f}      '
